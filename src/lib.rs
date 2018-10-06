@@ -1,14 +1,17 @@
 #[macro_use]
 extern crate failure_derive;
 
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
+use core::marker::PhantomData;
+
+use std::{
+    os::raw::c_int,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
 };
 
-use std::os::raw::c_int;
-
-use enet_sys::{enet_deinitialize, enet_initialize, enet_linked_version, ENetVersion};
+use enet_sys::{enet_deinitialize, enet_initialize, enet_linked_version};
 
 const ENET_UNINITIALIZED: usize = 1;
 const ENET_INITIALIZED: usize = 2;
@@ -16,7 +19,11 @@ const ENET_DEINITIALIZED: usize = 3;
 
 static ENET_STATUS: AtomicUsize = AtomicUsize::new(ENET_UNINITIALIZED);
 
-pub struct Enet {}
+pub use enet_sys::ENetVersion;
+
+pub struct Enet {
+    _not_send_and_sync: PhantomData<*const ()>,
+}
 
 #[derive(Fail, Debug)]
 pub enum InitializationError {
@@ -46,7 +53,9 @@ impl Enet {
             return Err(InitializationError::EnetFailure(r));
         }
 
-        Ok(Arc::new(Enet {}))
+        Ok(Arc::new(Enet {
+            _not_send_and_sync: Default::default(),
+        }))
     }
 
     pub fn linked_version() -> ENetVersion {
@@ -58,7 +67,10 @@ impl Drop for Enet {
     fn drop(&mut self) {
         match ENET_STATUS.compare_and_swap(ENET_INITIALIZED, ENET_DEINITIALIZED, Ordering::SeqCst) {
             ENET_INITIALIZED => (),
-            other => panic!("enet-rs internal error; unexpected value in ENET_STATUS (drop): {}", other),
+            other => panic!(
+                "enet-rs internal error; unexpected value in ENET_STATUS (drop): {}",
+                other
+            ),
         };
 
         unsafe {
