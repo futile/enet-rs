@@ -42,8 +42,14 @@ mod tests {
     use std::net::Ipv4Addr;
 
     #[test]
-    fn test_from_hostname() {
+    fn test_from_valid_hostname() {
         let addr = EnetAddress::from_hostname(&CString::new("localhost").unwrap(), 0).unwrap();
         assert_eq!(addr.addr.ip(), &Ipv4Addr::new(127, 0, 0, 1));
+        assert_eq!(addr.addr.port(), 0);
+    }
+
+    #[test]
+    fn test_from_invalid_hostname() {
+        assert!(EnetAddress::from_hostname(&CString::new("edtuarendt").unwrap(), 0).is_err());
     }
 }
