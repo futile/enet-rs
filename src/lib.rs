@@ -13,17 +13,27 @@ use std::{
 
 use enet_sys::{enet_deinitialize, enet_initialize, enet_linked_version};
 
+mod host;
+mod address;
+
+pub use crate::host::Host;
+pub use crate::address::EnetAddress;
+
 const ENET_UNINITIALIZED: usize = 1;
 const ENET_INITIALIZED: usize = 2;
 const ENET_DEINITIALIZED: usize = 3;
 
 static ENET_STATUS: AtomicUsize = AtomicUsize::new(ENET_UNINITIALIZED);
 
-pub use enet_sys::ENetVersion;
+pub use enet_sys::{ENetVersion as EnetVersion};
 
 pub struct Enet {
     _not_send_and_sync: PhantomData<*const ()>,
 }
+
+#[derive(Fail, Debug)]
+#[fail(display = "enet failure, returned '{}'", _0)]
+pub struct EnetFailure(c_int);
 
 #[derive(Fail, Debug)]
 pub enum InitializationError {
@@ -58,7 +68,7 @@ impl Enet {
         }))
     }
 
-    pub fn linked_version() -> ENetVersion {
+    pub fn linked_version() -> EnetVersion {
         unsafe { enet_linked_version() }
     }
 }
