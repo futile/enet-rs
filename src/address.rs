@@ -50,6 +50,6 @@ mod tests {
 
     #[test]
     fn test_from_invalid_hostname() {
-        assert!(EnetAddress::from_hostname(&CString::new("edtuarendt").unwrap(), 0).is_err());
+        assert!(EnetAddress::from_hostname(&CString::new("").unwrap(), 0).is_err());
     }
 }
