@@ -1,7 +1,12 @@
+#![feature(arbitrary_self_types)]
+#![feature(optin_builtin_traits)]
+
 #[macro_use]
 extern crate failure_derive;
 
-use core::marker::PhantomData;
+#[cfg(test)]
+#[macro_use]
+extern crate lazy_static;
 
 use std::{
     os::raw::c_int,
@@ -11,7 +16,7 @@ use std::{
     },
 };
 
-use enet_sys::{enet_deinitialize, enet_initialize, enet_linked_version};
+use enet_sys::{enet_deinitialize, enet_initialize, enet_linked_version, enet_host_create};
 
 mod host;
 mod address;
@@ -19,16 +24,17 @@ mod address;
 pub use crate::host::Host;
 pub use crate::address::EnetAddress;
 
+pub use enet_sys::{ENetVersion as EnetVersion, ENetAddress};
+
 const ENET_UNINITIALIZED: usize = 1;
 const ENET_INITIALIZED: usize = 2;
 const ENET_DEINITIALIZED: usize = 3;
 
 static ENET_STATUS: AtomicUsize = AtomicUsize::new(ENET_UNINITIALIZED);
 
-pub use enet_sys::{ENetVersion as EnetVersion};
-
+#[derive(Debug)]
 pub struct Enet {
-    _not_send_and_sync: PhantomData<*const ()>,
+    _reserved: ()
 }
 
 #[derive(Fail, Debug)]
@@ -64,12 +70,37 @@ impl Enet {
         }
 
         Ok(Arc::new(Enet {
-            _not_send_and_sync: Default::default(),
+            _reserved: (),
         }))
     }
 
     pub fn linked_version() -> EnetVersion {
         unsafe { enet_linked_version() }
+    }
+
+    pub fn create_host(self: &Arc<Self>,
+                       address: &EnetAddress,
+                       max_peer_count: usize,
+                       max_channel_count: Option<usize>,
+                       incoming_bandwidth: Option<u32>,
+                       outgoing_bandwidth: Option<u32>,
+    ) -> Result<Host, EnetFailure> {
+        let addr = address.to_enet_address();
+        let inner = unsafe {
+            enet_host_create(
+                &addr as *const ENetAddress,
+                max_peer_count,
+                max_channel_count.unwrap_or(0),
+                incoming_bandwidth.unwrap_or(0),
+                outgoing_bandwidth.unwrap_or(0),
+            )
+        };
+
+        if inner.is_null() {
+            return Err(EnetFailure(0));
+        }
+
+        Ok(Host::new(self.clone(), inner))
     }
 }
 
@@ -91,14 +122,25 @@ impl Drop for Enet {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
     use super::Enet;
+
+    lazy_static! {
+        static ref ENET: Arc<Enet> = Enet::new().unwrap();
+    }
 
     #[test]
     fn test_enet_new() {
-        {
-            let _ = Enet::new().unwrap();
-            assert!(Enet::new().is_err());
-        }
+        let _ = *ENET; // make sure the lazy_static is initialized
         assert!(Enet::new().is_err());
+    }
+
+    #[test]
+    fn test_host_create_localhost() {
+        use crate::EnetAddress;
+        use std::net::Ipv4Addr;
+
+        let enet = &*ENET;
+        enet.create_host(&EnetAddress::new(Ipv4Addr::LOCALHOST, 12345), 1, None, None, None).unwrap();
     }
 }

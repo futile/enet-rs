@@ -1,7 +1,11 @@
-use crate::EnetFailure;
-
 use std::ffi::CString;
 use std::net::{Ipv4Addr, SocketAddrV4};
+
+use byteorder::{NetworkEndian, ReadBytesExt};
+
+use crate::EnetFailure;
+
+use enet_sys::ENetAddress;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EnetAddress {
@@ -39,6 +43,13 @@ impl EnetAddress {
 
     pub fn port(&self) -> u16 {
         self.addr.port()
+    }
+
+    pub(crate) fn to_enet_address(&self) -> ENetAddress {
+        ENetAddress {
+            host: (&self.ip().octets() as &[u8]).read_u32::<NetworkEndian>().unwrap().to_be(),
+            port: self.port()
+        }
     }
 }
 
