@@ -1,3 +1,35 @@
+//! This crate provides high-level bindings for the [ENet](http://enet.bespin.org/) networking library.
+//!
+//! ENet provides features that are most typically used by games, such as unreliable but sequenced data transfer over UDP.
+//! ENet also provides optional reliability, and provides multiple channels over a single connection.
+//! For more info see the [ENet website](http://enet.bespin.org/).
+//!
+//! This crate aims to provide high-level, rust-y binding for the ENet library, based on existing low-level [C-bindings](https://crates.io/crates/enet-sys), so users don't have to deal with ffi.
+//!
+//! The official ENet documentation and tutorials are a good starting point to working with ENet.
+//! Most principles and names should be straight-forward to transfer to this library.
+//!
+//! # Examples
+//! This will initialize ENet and deinitialize it when the `Enet`-instance - and all references to it - are dropped:
+//!
+//! ```
+//! use enet::Enet;
+//!
+//! // `Enet::new()` initializes ENet when it is first called.
+//! let enet = Enet::new().unwrap();
+//!
+//! // Deinitialization is handled automatically (using Arc).
+//! ```
+//!
+//! Also check out the examples in the code, as well as the examples from the official ENet website and from the enet-sys crate.
+//!
+//! # Thread-safety
+//! ENet claims to be "mostly" thread-safe as long as access to individual `Host`-instances is handled in a synchronized manner.
+//! This is kind of an unclear statement, but this API tries to follow that as good as possible.
+//! So if the rust compilers allows you to send/sync an object between threads, it should be safe to do so.
+//!
+//! If you used no unsafe code and the library blows up in your face, that is considered a bug. Please report any such bug you encounter via [github](https://github.com/futile/enet-rs).
+
 #![feature(arbitrary_self_types)]
 
 #[macro_use]
@@ -15,15 +47,15 @@ use std::{
     },
 };
 
-use enet_sys::{enet_deinitialize, enet_initialize, enet_linked_version, enet_host_create};
+use enet_sys::{enet_deinitialize, enet_host_create, enet_initialize, enet_linked_version};
 
-mod host;
 mod address;
+mod host;
 
-pub use crate::host::Host;
 pub use crate::address::EnetAddress;
+pub use crate::host::Host;
 
-pub use enet_sys::{ENetVersion as EnetVersion, ENetAddress};
+pub use enet_sys::ENetVersion as EnetVersion;
 
 const ENET_UNINITIALIZED: usize = 1;
 const ENET_INITIALIZED: usize = 2;
@@ -31,15 +63,21 @@ const ENET_DEINITIALIZED: usize = 3;
 
 static ENET_STATUS: AtomicUsize = AtomicUsize::new(ENET_UNINITIALIZED);
 
+/// Main API entry point. Provides methods such as host and peer creation.
+///
+/// Creating an instance of this struct for the first time (using `new`) will initialize ENet.
+/// Afterwards, this struct can be used to performs tasks 
 #[derive(Debug)]
 pub struct Enet {
-    _reserved: ()
+    _reserved: (),
 }
 
+/// Generic ENet error, returned by many API functions.
 #[derive(Fail, Debug)]
 #[fail(display = "enet failure, returned '{}'", _0)]
-pub struct EnetFailure(c_int);
+pub struct EnetFailure(pub c_int);
 
+/// An error that can occur when initializing ENet.
 #[derive(Fail, Debug)]
 pub enum InitializationError {
     #[fail(display = "ENet has already been initialized before")]
@@ -68,22 +106,23 @@ impl Enet {
             return Err(InitializationError::EnetFailure(r));
         }
 
-        Ok(Arc::new(Enet {
-            _reserved: (),
-        }))
+        Ok(Arc::new(Enet { _reserved: () }))
     }
 
     pub fn linked_version() -> EnetVersion {
         unsafe { enet_linked_version() }
     }
 
-    pub fn create_host(self: &Arc<Self>,
-                       address: &EnetAddress,
-                       max_peer_count: usize,
-                       max_channel_count: Option<usize>,
-                       incoming_bandwidth: Option<u32>,
-                       outgoing_bandwidth: Option<u32>,
+    pub fn create_host(
+        self: &Arc<Self>,
+        address: &EnetAddress,
+        max_peer_count: usize,
+        max_channel_count: Option<usize>,
+        incoming_bandwidth: Option<u32>,
+        outgoing_bandwidth: Option<u32>,
     ) -> Result<Host, EnetFailure> {
+        use enet_sys::ENetAddress;
+
         let addr = address.to_enet_address();
         let inner = unsafe {
             enet_host_create(
@@ -121,8 +160,8 @@ impl Drop for Enet {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
     use super::Enet;
+    use std::sync::Arc;
 
     lazy_static! {
         static ref ENET: Arc<Enet> = Enet::new().unwrap();
@@ -140,6 +179,13 @@ mod tests {
         use std::net::Ipv4Addr;
 
         let enet = &*ENET;
-        enet.create_host(&EnetAddress::new(Ipv4Addr::LOCALHOST, 12345), 1, None, None, None).unwrap();
+        enet.create_host(
+            &EnetAddress::new(Ipv4Addr::LOCALHOST, 12345),
+            1,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
     }
 }

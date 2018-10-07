@@ -1,5 +1,5 @@
 [package]
-name = "enet-rs"
+name = "enet"
 version = "0.1.0"
 authors = ["Felix Rath <felixm.rath@gmail.com>"]
 edition = "2018"

@@ -7,6 +7,7 @@ use crate::EnetFailure;
 
 use enet_sys::ENetAddress;
 
+/// An IPv4 address that can be used with the ENet API.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EnetAddress {
     addr: SocketAddrV4,
@@ -47,8 +48,11 @@ impl EnetAddress {
 
     pub(crate) fn to_enet_address(&self) -> ENetAddress {
         ENetAddress {
-            host: (&self.ip().octets() as &[u8]).read_u32::<NetworkEndian>().unwrap().to_be(),
-            port: self.port()
+            host: (&self.ip().octets() as &[u8])
+                .read_u32::<NetworkEndian>()
+                .unwrap()
+                .to_be(),
+            port: self.port(),
         }
     }
 }
