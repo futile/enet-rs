@@ -5,7 +5,7 @@ use std::net::{Ipv4Addr, SocketAddrV4};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EnetAddress {
-    pub addr: SocketAddrV4,
+    addr: SocketAddrV4,
 }
 
 impl EnetAddress {
@@ -31,6 +31,14 @@ impl EnetAddress {
             Ipv4Addr::from(u32::from_be(addr.host)),
             addr.port,
         ))
+    }
+
+    pub fn ip(&self) -> &Ipv4Addr {
+        self.addr.ip()
+    }
+
+    pub fn port(&self) -> u16 {
+        self.addr.port()
     }
 }
 
