@@ -14,12 +14,14 @@ pub struct EnetAddress {
 }
 
 impl EnetAddress {
+    /// Create a new address from an ip and a port.
     pub fn new(addr: Ipv4Addr, port: u16) -> EnetAddress {
         EnetAddress {
             addr: SocketAddrV4::new(addr, port),
         }
     }
 
+    /// Create a new address from a given hostname.
     pub fn from_hostname(hostname: &CString, port: u16) -> Result<EnetAddress, EnetFailure> {
         use enet_sys::{enet_address_set_host, ENetAddress};
 
@@ -38,10 +40,12 @@ impl EnetAddress {
         ))
     }
 
+    /// Return the ip of this address
     pub fn ip(&self) -> &Ipv4Addr {
         self.addr.ip()
     }
 
+    /// Returns the port of this address
     pub fn port(&self) -> u16 {
         self.addr.port()
     }

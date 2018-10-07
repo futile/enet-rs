@@ -28,7 +28,7 @@
 //! This is kind of an unclear statement, but this API tries to follow that as good as possible.
 //! So if the rust compilers allows you to send/sync an object between threads, it should be safe to do so.
 //!
-//! If you used no unsafe code and the library blows up in your face, that is considered a bug. Please report any such bug you encounter via [github](https://github.com/futile/enet-rs).
+//! If you used no unsafe code and the library blows up in your face, that is considered a bug. Please report any bug you encounter via [github](https://github.com/futile/enet-rs).
 
 #![feature(arbitrary_self_types)]
 
@@ -65,14 +65,19 @@ static ENET_STATUS: AtomicUsize = AtomicUsize::new(ENET_UNINITIALIZED);
 
 /// Main API entry point. Provides methods such as host and peer creation.
 ///
-/// Creating an instance of this struct for the first time (using `new`) will initialize ENet.
-/// Afterwards, this struct can be used to performs tasks 
-#[derive(Debug)]
+/// Creating an instance of this struct for the first time (using `new()`) will initialize ENet.
+/// Further attempts to create instances will result in errors, so it can only be constructed once (but it can be cloned).
+///
+/// This struct can be used to performs most top-level ENet functionality, such as host creation and
+/// connection establishment.
+#[derive(Debug, Clone)]
 pub struct Enet {
     _reserved: (),
 }
 
 /// Generic ENet error, returned by many API functions.
+///
+/// Contains the return value of the failed function call.
 #[derive(Fail, Debug)]
 #[fail(display = "enet failure, returned '{}'", _0)]
 pub struct EnetFailure(pub c_int);
@@ -80,15 +85,19 @@ pub struct EnetFailure(pub c_int);
 /// An error that can occur when initializing ENet.
 #[derive(Fail, Debug)]
 pub enum InitializationError {
+    /// ENet was already initialized. `Enet::new()` can only (successfully) be called once, so reuse that object.
     #[fail(display = "ENet has already been initialized before")]
     AlreadyInitialized,
+    /// ENet was already deinitialized. Probably continue using your previous `Enet`-instance.
     #[fail(display = "ENet has already been deinitialized before")]
     AlreadyDeinitialized,
+    /// Internal ENet failure (`enet_initialize` failed), containing the return code.
     #[fail(display = "enet_initialize failed (with '{}')", _0)]
     EnetFailure(c_int),
 }
 
 impl Enet {
+    /// Initializes ENet and returns a handle to the top-level functionality, in the form of an `Enet`-instance.
     pub fn new() -> Result<Arc<Enet>, InitializationError> {
         match ENET_STATUS.compare_and_swap(ENET_UNINITIALIZED, ENET_INITIALIZED, Ordering::SeqCst) {
             ENET_UNINITIALIZED => (),
@@ -109,10 +118,15 @@ impl Enet {
         Ok(Arc::new(Enet { _reserved: () }))
     }
 
+    /// Static function that returns the version of the linked ENet library.
     pub fn linked_version() -> EnetVersion {
         unsafe { enet_linked_version() }
     }
 
+    /// Create a `Host`. A `Host` is an endpoint of an ENet connection. For more information
+    /// consult the official ENet-documentation.
+    ///
+    /// Optional fields will be set to their (ENet-specified) default values if `None`.
     pub fn create_host(
         self: &Arc<Self>,
         address: &EnetAddress,
