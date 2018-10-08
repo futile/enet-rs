@@ -118,11 +118,6 @@ impl Enet {
         Ok(Arc::new(Enet { _reserved: () }))
     }
 
-    /// Static function that returns the version of the linked ENet library.
-    pub fn linked_version() -> EnetVersion {
-        unsafe { enet_linked_version() }
-    }
-
     /// Create a `Host`. A `Host` is an endpoint of an ENet connection. For more information
     /// consult the official ENet-documentation.
     ///
@@ -154,6 +149,11 @@ impl Enet {
 
         Ok(Host::new(self.clone(), inner))
     }
+}
+
+/// Returns the version of the linked ENet library.
+pub fn linked_version() -> EnetVersion {
+    unsafe { enet_linked_version() }
 }
 
 impl Drop for Enet {

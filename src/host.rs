@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{Enet, EnetFailure};
+use crate::Enet;
 
 use enet_sys::{enet_host_destroy, ENetHost};
 
