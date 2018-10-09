@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
-use crate::EnetKeepAlive;
+use crate::{EnetKeepAlive, EnetAddress};
 
 use enet_sys::{
     enet_host_bandwidth_limit, enet_host_channel_limit, enet_host_destroy, enet_host_flush,
+    ENET_PROTOCOL_MAXIMUM_CHANNEL_COUNT,
     ENetHost,
 };
 
@@ -30,6 +31,15 @@ impl ChannelLimit {
         match *self {
             ChannelLimit::Maximum => 0,
             ChannelLimit::Limited(l) => l,
+        }
+    }
+
+    fn from_enet_usize(enet_val: usize) -> ChannelLimit {
+        const MAX_COUNT: usize = ENET_PROTOCOL_MAXIMUM_CHANNEL_COUNT as usize;
+        match enet_val {
+            MAX_COUNT => ChannelLimit::Maximum,
+            0 => panic!("ChannelLimit::from_enet_usize: got 0"),
+            lim => ChannelLimit::Limited(lim),
         }
     }
 }
@@ -67,7 +77,7 @@ impl Host {
         }
     }
 
-    /// Sets the bandwith limits for this host.
+    /// Sets the bandwith limits for this `Host`.
     pub fn set_bandwith_limits(
         &mut self,
         incoming_bandwith: BandwidthLimit,
@@ -83,11 +93,44 @@ impl Host {
     }
 
     /// Sets the maximum allowed channels of future connections.
-    ///
-    /// Pass `None` to use ENet defaults, which set the value to its maximum.
-    pub fn set_channel_limit(&mut self, max_channel_count: Option<usize>) {
+    pub fn set_channel_limit(&mut self, max_channel_count: ChannelLimit) {
         unsafe {
-            enet_host_channel_limit(self.inner, max_channel_count.unwrap_or(0));
+            enet_host_channel_limit(self.inner, max_channel_count.to_enet_usize());
+        }
+    }
+
+    /// Returns the limit of channels per connected peer for this `Host`.
+    pub fn channel_limit(&self) -> ChannelLimit {
+        ChannelLimit::from_enet_usize(unsafe {
+            (*self.inner).channelLimit
+        })
+    }
+
+    /// Returns the downstream bandwidth of this `Host` in bytes/second.
+    pub fn incoming_bandwidth(&self) -> u32 {
+        unsafe {
+            (*self.inner).incomingBandwidth
+        }
+    }
+
+    /// Returns the upstream bandwidth of this `Host` in bytes/second.
+    pub fn outgoing_bandwidth(&self) -> u32 {
+        unsafe {
+            (*self.inner).outgoingBandwidth
+        }
+    }
+
+    /// Returns the internet address of this `Host`.
+    pub fn address(&self) -> EnetAddress {
+        EnetAddress::from_enet_address(& unsafe{
+            (*self.inner).address
+        })
+    }
+
+    /// Returns the number of peers allocated for this `Host`.
+    pub fn peer_count(&self) -> usize {
+        unsafe {
+            (*self.inner).peerCount
         }
     }
 }
