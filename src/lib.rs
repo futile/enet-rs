@@ -51,7 +51,7 @@ mod address;
 mod host;
 
 pub use crate::address::EnetAddress;
-pub use crate::host::{BandwidthLimit, Host};
+pub use crate::host::{BandwidthLimit, ChannelLimit, Host};
 
 pub use enet_sys::ENetVersion as EnetVersion;
 
@@ -129,7 +129,7 @@ impl Enet {
         &self,
         address: &EnetAddress,
         max_peer_count: usize,
-        max_channel_count: Option<usize>,
+        max_channel_count: ChannelLimit,
         incoming_bandwidth: BandwidthLimit,
         outgoing_bandwidth: BandwidthLimit,
     ) -> Result<Host, EnetFailure> {
@@ -140,7 +140,7 @@ impl Enet {
             enet_host_create(
                 &addr as *const ENetAddress,
                 max_peer_count,
-                max_channel_count.unwrap_or(0),
+                max_channel_count.to_enet_usize(),
                 incoming_bandwidth.to_enet_u32(),
                 outgoing_bandwidth.to_enet_u32(),
             )
@@ -177,7 +177,7 @@ impl Drop for EnetKeepAlive {
 
 #[cfg(test)]
 mod tests {
-    use super::{BandwidthLimit, Enet};
+    use super::{BandwidthLimit, ChannelLimit, Enet};
 
     lazy_static! {
         static ref ENET: Enet = Enet::new().unwrap();
@@ -198,7 +198,7 @@ mod tests {
         enet.create_host(
             &EnetAddress::new(Ipv4Addr::LOCALHOST, 12345),
             1,
-            None,
+            ChannelLimit::Maximum,
             BandwidthLimit::Unlimited,
             BandwidthLimit::Unlimited,
         )

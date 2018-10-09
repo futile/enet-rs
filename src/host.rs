@@ -16,6 +16,24 @@ pub enum BandwidthLimit {
     Limited(u32),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// Represents a channel limit or unlimited.
+pub enum ChannelLimit {
+    /// Maximum limit on the number of channels
+    Maximum,
+    /// Channel limit
+    Limited(usize),
+}
+
+impl ChannelLimit {
+    pub(in crate) fn to_enet_usize(&self) -> usize {
+        match *self {
+            ChannelLimit::Maximum => 0,
+            ChannelLimit::Limited(l) => l,
+        }
+    }
+}
+
 impl BandwidthLimit {
     pub(in crate) fn to_enet_u32(&self) -> u32 {
         match *self {
