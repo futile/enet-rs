@@ -51,7 +51,7 @@ mod address;
 mod host;
 
 pub use crate::address::EnetAddress;
-pub use crate::host::Host;
+pub use crate::host::{BandwidthLimit, Host};
 
 pub use enet_sys::ENetVersion as EnetVersion;
 
@@ -121,17 +121,17 @@ impl Enet {
         })
     }
 
-    /// Create a `Host`. A `Host` is an endpoint of an ENet connection. For more information
+    /// Creates a `Host`. A `Host` is an endpoint of an ENet connection. For more information
     /// consult the official ENet-documentation.
     ///
-    /// Optional fields will be set to their (ENet-specified) default values if `None`.
+    /// `max_channel_count` will be set to its (ENet-specified) default value if `None`.
     pub fn create_host(
         &self,
         address: &EnetAddress,
         max_peer_count: usize,
         max_channel_count: Option<usize>,
-        incoming_bandwidth: Option<u32>,
-        outgoing_bandwidth: Option<u32>,
+        incoming_bandwidth: BandwidthLimit,
+        outgoing_bandwidth: BandwidthLimit,
     ) -> Result<Host, EnetFailure> {
         use enet_sys::ENetAddress;
 
@@ -141,8 +141,8 @@ impl Enet {
                 &addr as *const ENetAddress,
                 max_peer_count,
                 max_channel_count.unwrap_or(0),
-                incoming_bandwidth.unwrap_or(0),
-                outgoing_bandwidth.unwrap_or(0),
+                incoming_bandwidth.to_enet_u32(),
+                outgoing_bandwidth.to_enet_u32(),
             )
         };
 
@@ -177,7 +177,7 @@ impl Drop for EnetKeepAlive {
 
 #[cfg(test)]
 mod tests {
-    use super::Enet;
+    use super::{BandwidthLimit, Enet};
 
     lazy_static! {
         static ref ENET: Enet = Enet::new().unwrap();
@@ -199,8 +199,8 @@ mod tests {
             &EnetAddress::new(Ipv4Addr::LOCALHOST, 12345),
             1,
             None,
-            None,
-            None,
+            BandwidthLimit::Unlimited,
+            BandwidthLimit::Unlimited,
         )
         .unwrap();
     }
