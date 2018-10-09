@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::Enet;
+use crate::EnetKeepAlive;
 
 use enet_sys::{enet_host_destroy, ENetHost};
 
@@ -8,15 +8,15 @@ use enet_sys::{enet_host_destroy, ENetHost};
 ///
 /// This type provides functionality such as connection establishment and packet transmission.
 pub struct Host {
-    _enet: Arc<Enet>,
+    _keep_alive: Arc<EnetKeepAlive>,
     inner: *mut ENetHost,
 }
 
 impl Host {
-    pub(in crate) fn new(_enet: Arc<Enet>, inner: *mut ENetHost) -> Host {
+    pub(in crate) fn new(_keep_alive: Arc<EnetKeepAlive>, inner: *mut ENetHost) -> Host {
         assert!(!inner.is_null());
 
-        Host { _enet, inner }
+        Host { _keep_alive, inner }
     }
 }
 

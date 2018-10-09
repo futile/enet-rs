@@ -30,8 +30,6 @@
 //!
 //! If you used no unsafe code and the library blows up in your face, that is considered a bug. Please report any bug you encounter via [github](https://github.com/futile/enet-rs).
 
-#![feature(arbitrary_self_types)]
-
 #[macro_use]
 extern crate failure_derive;
 
@@ -63,6 +61,9 @@ const ENET_DEINITIALIZED: usize = 3;
 
 static ENET_STATUS: AtomicUsize = AtomicUsize::new(ENET_UNINITIALIZED);
 
+#[derive(Debug, Clone)]
+struct EnetKeepAlive;
+
 /// Main API entry point. Provides methods such as host and peer creation.
 ///
 /// Creating an instance of this struct for the first time (using `new()`) will initialize ENet.
@@ -72,7 +73,7 @@ static ENET_STATUS: AtomicUsize = AtomicUsize::new(ENET_UNINITIALIZED);
 /// connection establishment.
 #[derive(Debug, Clone)]
 pub struct Enet {
-    _reserved: (),
+    keep_alive: Arc<EnetKeepAlive>,
 }
 
 /// Generic ENet error, returned by many API functions.
@@ -98,7 +99,7 @@ pub enum InitializationError {
 
 impl Enet {
     /// Initializes ENet and returns a handle to the top-level functionality, in the form of an `Enet`-instance.
-    pub fn new() -> Result<Arc<Enet>, InitializationError> {
+    pub fn new() -> Result<Enet, InitializationError> {
         match ENET_STATUS.compare_and_swap(ENET_UNINITIALIZED, ENET_INITIALIZED, Ordering::SeqCst) {
             ENET_UNINITIALIZED => (),
             ENET_INITIALIZED => return Err(InitializationError::AlreadyInitialized),
@@ -115,7 +116,9 @@ impl Enet {
             return Err(InitializationError::EnetFailure(r));
         }
 
-        Ok(Arc::new(Enet { _reserved: () }))
+        Ok(Enet {
+            keep_alive: Arc::new(EnetKeepAlive),
+        })
     }
 
     /// Create a `Host`. A `Host` is an endpoint of an ENet connection. For more information
@@ -123,7 +126,7 @@ impl Enet {
     ///
     /// Optional fields will be set to their (ENet-specified) default values if `None`.
     pub fn create_host(
-        self: &Arc<Self>,
+        &self,
         address: &EnetAddress,
         max_peer_count: usize,
         max_channel_count: Option<usize>,
@@ -147,7 +150,7 @@ impl Enet {
             return Err(EnetFailure(0));
         }
 
-        Ok(Host::new(self.clone(), inner))
+        Ok(Host::new(self.keep_alive.clone(), inner))
     }
 }
 
@@ -156,7 +159,7 @@ pub fn linked_version() -> EnetVersion {
     unsafe { enet_linked_version() }
 }
 
-impl Drop for Enet {
+impl Drop for EnetKeepAlive {
     fn drop(&mut self) {
         match ENET_STATUS.compare_and_swap(ENET_INITIALIZED, ENET_DEINITIALIZED, Ordering::SeqCst) {
             ENET_INITIALIZED => (),
@@ -175,10 +178,9 @@ impl Drop for Enet {
 #[cfg(test)]
 mod tests {
     use super::Enet;
-    use std::sync::Arc;
 
     lazy_static! {
-        static ref ENET: Arc<Enet> = Enet::new().unwrap();
+        static ref ENET: Enet = Enet::new().unwrap();
     }
 
     #[test]
@@ -192,7 +194,7 @@ mod tests {
         use crate::EnetAddress;
         use std::net::Ipv4Addr;
 
-        let enet = &*ENET;
+        let enet = &ENET;
         enet.create_host(
             &EnetAddress::new(Ipv4Addr::LOCALHOST, 12345),
             1,
