@@ -1,11 +1,11 @@
+use std::marker::PhantomData;
 use std::sync::Arc;
 
-use crate::{EnetKeepAlive, EnetAddress};
+use crate::{EnetAddress, EnetEvent, EnetKeepAlive, EnetFailure};
 
 use enet_sys::{
     enet_host_bandwidth_limit, enet_host_channel_limit, enet_host_destroy, enet_host_flush,
-    ENET_PROTOCOL_MAXIMUM_CHANNEL_COUNT,
-    ENetHost,
+    enet_host_service, ENetEvent, ENetHost, ENET_PROTOCOL_MAXIMUM_CHANNEL_COUNT,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -56,16 +56,22 @@ impl BandwidthLimit {
 /// A `Host` represents one endpoint of an ENet connection. Created through `Enet`.
 ///
 /// This type provides functionality such as connection establishment and packet transmission.
-pub struct Host {
-    _keep_alive: Arc<EnetKeepAlive>,
+pub struct Host<T> {
     inner: *mut ENetHost,
+
+    _keep_alive: Arc<EnetKeepAlive>,
+    _peer_data: PhantomData<*const T>,
 }
 
-impl Host {
-    pub(in crate) fn new(_keep_alive: Arc<EnetKeepAlive>, inner: *mut ENetHost) -> Host {
+impl<T> Host<T> {
+    pub(in crate) fn new(_keep_alive: Arc<EnetKeepAlive>, inner: *mut ENetHost) -> Host<T> {
         assert!(!inner.is_null());
 
-        Host { _keep_alive, inner }
+        Host {
+            inner,
+            _keep_alive,
+            _peer_data: PhantomData,
+        }
     }
 
     /// Sends any queued packets on the host specified to its designated peers.
@@ -101,41 +107,48 @@ impl Host {
 
     /// Returns the limit of channels per connected peer for this `Host`.
     pub fn channel_limit(&self) -> ChannelLimit {
-        ChannelLimit::from_enet_usize(unsafe {
-            (*self.inner).channelLimit
-        })
+        ChannelLimit::from_enet_usize(unsafe { (*self.inner).channelLimit })
     }
 
     /// Returns the downstream bandwidth of this `Host` in bytes/second.
     pub fn incoming_bandwidth(&self) -> u32 {
-        unsafe {
-            (*self.inner).incomingBandwidth
-        }
+        unsafe { (*self.inner).incomingBandwidth }
     }
 
     /// Returns the upstream bandwidth of this `Host` in bytes/second.
     pub fn outgoing_bandwidth(&self) -> u32 {
-        unsafe {
-            (*self.inner).outgoingBandwidth
-        }
+        unsafe { (*self.inner).outgoingBandwidth }
     }
 
     /// Returns the internet address of this `Host`.
     pub fn address(&self) -> EnetAddress {
-        EnetAddress::from_enet_address(& unsafe{
-            (*self.inner).address
-        })
+        EnetAddress::from_enet_address(&unsafe { (*self.inner).address })
     }
 
     /// Returns the number of peers allocated for this `Host`.
     pub fn peer_count(&self) -> usize {
-        unsafe {
-            (*self.inner).peerCount
+        unsafe { (*self.inner).peerCount }
+    }
+
+    /// Maintains this host and delivers an event if available.
+    ///
+    /// This should be called regularly for ENet to work properly with good performance.
+    pub fn service(&'_ mut self, timeout_ms: u32) -> Result<Option<EnetEvent<'_, T>>, EnetFailure> {
+        let mut sys_event: ENetEvent = unsafe { std::mem::uninitialized() };
+
+        let res =
+            unsafe { enet_host_service(self.inner, &mut sys_event as *mut ENetEvent, timeout_ms) };
+
+        match res {
+            r if r > 0 => Ok(EnetEvent::from_sys_event(&sys_event)),
+            0 => Ok(None),
+            r if r < 0 => Err(EnetFailure(r)),
+            _ => panic!("unreachable"),
         }
     }
 }
 
-impl Drop for Host {
+impl<T> Drop for Host<T> {
     /// Call the corresponding ENet cleanup-function(s).
     fn drop(&mut self) {
         unsafe {

@@ -49,9 +49,15 @@ use enet_sys::{enet_deinitialize, enet_host_create, enet_initialize, enet_linked
 
 mod address;
 mod host;
+mod event;
+mod packet;
+mod peer;
 
 pub use crate::address::EnetAddress;
 pub use crate::host::{BandwidthLimit, ChannelLimit, Host};
+pub use crate::packet::EnetPacket;
+pub use crate::peer::EnetPeer;
+pub use crate::event::EnetEvent;
 
 pub use enet_sys::ENetVersion as EnetVersion;
 
@@ -125,14 +131,16 @@ impl Enet {
     /// consult the official ENet-documentation.
     ///
     /// `max_channel_count` will be set to its (ENet-specified) default value if `None`.
-    pub fn create_host(
+    ///
+    /// The type `T` specifies the data associated with corresponding `EnetPeer`s.
+    pub fn create_host<T>(
         &self,
         address: &EnetAddress,
         max_peer_count: usize,
         max_channel_count: ChannelLimit,
         incoming_bandwidth: BandwidthLimit,
         outgoing_bandwidth: BandwidthLimit,
-    ) -> Result<Host, EnetFailure> {
+    ) -> Result<Host<T>, EnetFailure> {
         use enet_sys::ENetAddress;
 
         let addr = address.to_enet_address();
@@ -195,7 +203,7 @@ mod tests {
         use std::net::Ipv4Addr;
 
         let enet = &ENET;
-        enet.create_host(
+        enet.create_host::<()>(
             &EnetAddress::new(Ipv4Addr::LOCALHOST, 12345),
             1,
             ChannelLimit::Maximum,
