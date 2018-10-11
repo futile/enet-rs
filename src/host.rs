@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use crate::{EnetAddress, EnetEvent, EnetKeepAlive, EnetFailure};
+use crate::{EnetAddress, EnetEvent, EnetFailure, EnetKeepAlive};
 
 use enet_sys::{
     enet_host_bandwidth_limit, enet_host_channel_limit, enet_host_destroy, enet_host_flush,

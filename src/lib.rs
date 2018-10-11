@@ -48,16 +48,16 @@ use std::{
 use enet_sys::{enet_deinitialize, enet_host_create, enet_initialize, enet_linked_version};
 
 mod address;
-mod host;
 mod event;
+mod host;
 mod packet;
 mod peer;
 
 pub use crate::address::EnetAddress;
+pub use crate::event::EnetEvent;
 pub use crate::host::{BandwidthLimit, ChannelLimit, Host};
 pub use crate::packet::EnetPacket;
 pub use crate::peer::EnetPeer;
-pub use crate::event::EnetEvent;
 
 pub use enet_sys::ENetVersion as EnetVersion;
 

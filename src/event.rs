@@ -5,12 +5,24 @@ use enet_sys::{
 
 use crate::{EnetPacket, EnetPeer};
 
+/// This enum represents an event that can occur when servicing an `EnetHost`.
+///
+/// Also see the official ENet documentation for more information.
 pub enum EnetEvent<'a, T> {
+    /// This variant represents the connection of a peer, contained in the only field.
     Connect(EnetPeer<'a, T>),
+    /// This variant represents the disconnection of a peer, either because it was requested or due to a timeout.
+    ///
+    /// The disconnected peer is contained in the first field, while the second field contains the user-specified
+    /// data for this disconnection.
     Disconnect(EnetPeer<'a, T>, u32),
+    /// This variants repersents a packet that was received.
     Receive {
+        /// The `Peer` that sent the packet.
         sender: EnetPeer<'a, T>,
+        /// The channel on which the packet was received.
         channel_id: u8,
+        /// The `Packet` that was received.
         packet: EnetPacket,
     },
 }
@@ -27,13 +39,11 @@ impl<'a, T> EnetEvent<'a, T> {
                 EnetPeer::new(event_sys.peer),
                 event_sys.data,
             )),
-            _ENetEventType_ENET_EVENT_TYPE_RECEIVE => {
-                Some(EnetEvent::Receive {
-                    sender: EnetPeer::new(event_sys.peer),
-                    channel_id: event_sys.channelID,
-                    packet: EnetPacket::new(event_sys.packet),
-                })
-            }
+            _ENetEventType_ENET_EVENT_TYPE_RECEIVE => Some(EnetEvent::Receive {
+                sender: EnetPeer::new(event_sys.peer),
+                channel_id: event_sys.channelID,
+                packet: EnetPacket::new(event_sys.packet),
+            }),
             _ => panic!("unrecognized event type: {}", event_sys.type_),
         }
     }

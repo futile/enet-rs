@@ -62,11 +62,13 @@ impl EnetAddress {
 
     pub(crate) fn from_enet_address(addr: &ENetAddress) -> EnetAddress {
         EnetAddress::new(
-            Ipv4Addr::new((addr.host >> 24) as u8,
-                          (addr.host >> 16) as u8,
-                          (addr.host >> 8) as u8,
-                          (addr.host >> 0) as u8),
-            addr.port
+            Ipv4Addr::new(
+                (addr.host >> 24) as u8,
+                (addr.host >> 16) as u8,
+                (addr.host >> 8) as u8,
+                (addr.host >> 0) as u8,
+            ),
+            addr.port,
         )
     }
 }

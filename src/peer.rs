@@ -1,10 +1,17 @@
 use std::marker::PhantomData;
 use std::time::Duration;
 
-use enet_sys::{ENetPeer};
+use enet_sys::ENetPeer;
 
-use crate::{EnetAddress};
+use crate::EnetAddress;
 
+/// This struct represents an endpoint in an ENet-connection.
+///
+/// The lifetime of these instances is not really clear from the ENet documentation.
+/// Therefore, `EnetPeer`s are always borrowed, and can not really be stored anywhere.
+///
+/// Additionally, ENet allows the association of arbitrary data with each peer.
+/// The type of this associated data is chosen through `T`.
 pub struct EnetPeer<'a, T: 'a> {
     inner: *mut ENetPeer,
 
@@ -19,17 +26,14 @@ impl<'a, T> EnetPeer<'a, T> {
         }
     }
 
+    /// Returns the address of this `Peer`.
     pub fn address(&self) -> EnetAddress {
-        EnetAddress::from_enet_address(& unsafe {
-            (*self.inner).address
-        })
+        EnetAddress::from_enet_address(&unsafe { (*self.inner).address })
     }
 
     /// Returns the amout of channels allocated for this `Peer`.
     pub fn channel_count(&self) -> usize {
-        unsafe {
-            (*self.inner).channelCount
-        }
+        unsafe { (*self.inner).channelCount }
     }
 
     /// Returns a reference to the data associated with this `Peer`, if set.
@@ -79,22 +83,16 @@ impl<'a, T> EnetPeer<'a, T> {
 
     /// Returns the downstream bandwidth of this `Peer` in bytes/second.
     pub fn incoming_bandwidth(&self) -> u32 {
-        unsafe {
-            (*self.inner).incomingBandwidth
-        }
+        unsafe { (*self.inner).incomingBandwidth }
     }
 
     /// Returns the upstream bandwidth of this `Peer` in bytes/second.
     pub fn outgoing_bandwidth(&self) -> u32 {
-        unsafe {
-            (*self.inner).outgoingBandwidth
-        }
+        unsafe { (*self.inner).outgoingBandwidth }
     }
 
     /// Returns the mean round trip time between sending a reliable packet and receiving its acknowledgement.
     pub fn mean_rtt(&self) -> Duration {
-        Duration::from_millis(unsafe {
-            (*self.inner).roundTripTime
-        } as u64)
+        Duration::from_millis(unsafe { (*self.inner).roundTripTime } as u64)
     }
 }
