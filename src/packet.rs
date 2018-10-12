@@ -69,8 +69,11 @@ impl EnetPacket {
         EnetPacket { inner }
     }
 
+    /// Does NOT run this `Packet`'s destructor.
     pub(crate) fn into_inner(self) -> *mut ENetPacket {
-        self.inner
+        let res = self.inner;
+        std::mem::forget(self);
+        res
     }
 
     /// Returns a reference to the bytes inside this packet.

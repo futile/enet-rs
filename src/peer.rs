@@ -1,9 +1,12 @@
 use std::marker::PhantomData;
 use std::time::Duration;
 
-use enet_sys::ENetPeer;
+use enet_sys::{
+    enet_peer_disconnect, enet_peer_disconnect_later, enet_peer_disconnect_now, enet_peer_receive,
+    enet_peer_reset, enet_peer_send, ENetPeer,
+};
 
-use crate::EnetAddress;
+use crate::{EnetAddress, EnetFailure, EnetPacket};
 
 /// This struct represents an endpoint in an ENet-connection.
 ///
@@ -94,5 +97,71 @@ impl<'a, T> EnetPeer<'a, T> {
     /// Returns the mean round trip time between sending a reliable packet and receiving its acknowledgement.
     pub fn mean_rtt(&self) -> Duration {
         Duration::from_millis(unsafe { (*self.inner).roundTripTime } as u64)
+    }
+
+    /// Forcefully disconnects this `Peer`.
+    ///
+    /// The foreign host represented by the peer is not notified of the disconnection and will timeout on its connection to the local host.
+    pub fn reset(self) {
+        unsafe {
+            enet_peer_reset(self.inner);
+        }
+    }
+
+    /// Queues a packet to be sent.
+    ///
+    /// Actual sending will happen during `Host::service`.
+    pub fn send_packet(&mut self, packet: EnetPacket, channel_id: u8) -> Result<(), EnetFailure> {
+        let res = unsafe { enet_peer_send(self.inner, channel_id, packet.into_inner()) };
+
+        match res {
+            r if r > 0 => panic!("unexpected res: {}", r),
+            0 => Ok(()),
+            r if r < 0 => Err(EnetFailure(r)),
+            _ => panic!("unreachable"),
+        }
+    }
+
+    /// Disconnects from this peer.
+    ///
+    /// A `Disconnect` event will be returned by `Host::service` once the disconnection is complete.
+    pub fn disconnect(&mut self, user_data: u32) {
+        unsafe {
+            enet_peer_disconnect(self.inner, user_data);
+        }
+    }
+
+    /// Disconnects from this peer immediately.
+    ///
+    /// No `Disconnect` event will be created. No disconnect notification for the foreign peer is guaranteed, and this `Peer` is immediately reset on return from this method.
+    pub fn disconnect_now(self, user_data: u32) {
+        unsafe {
+            enet_peer_disconnect_now(self.inner, user_data);
+        }
+    }
+
+    /// Disconnects from this peer after all outgoing packets have been sent.
+    ///
+    /// A `Disconnect` event will be returned by `Host::service` once the disconnection is complete.
+    pub fn disconnect_later(&mut self, user_data: u32) {
+        unsafe {
+            enet_peer_disconnect_later(self.inner, user_data);
+        }
+    }
+
+    /// Attempts to dequeue an incoming packet from this `Peer`.
+    ///
+    /// On success, returns the packet and the channel id of the receiving channel.
+    pub fn receive(&mut self) -> Option<(EnetPacket, u8)> {
+        let mut channel_id = 0u8;
+
+        let res = unsafe { enet_peer_receive(self.inner, &mut channel_id as *mut _) };
+
+        if res.is_null() {
+            return None;
+        }
+
+        // TODO: this packet might currently live longer than Enet is initialized!
+        Some((EnetPacket::from_sys_packet(res), channel_id))
     }
 }
