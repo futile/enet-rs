@@ -42,7 +42,7 @@ impl<'a, T> EnetEvent<'a, T> {
             _ENetEventType_ENET_EVENT_TYPE_RECEIVE => Some(EnetEvent::Receive {
                 sender: EnetPeer::new(event_sys.peer),
                 channel_id: event_sys.channelID,
-                packet: EnetPacket::new(event_sys.packet),
+                packet: EnetPacket::from_sys_packet(event_sys.packet),
             }),
             _ => panic!("unrecognized event type: {}", event_sys.type_),
         }

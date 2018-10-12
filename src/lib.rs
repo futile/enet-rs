@@ -56,7 +56,7 @@ mod peer;
 pub use crate::address::EnetAddress;
 pub use crate::event::EnetEvent;
 pub use crate::host::{BandwidthLimit, ChannelLimit, Host};
-pub use crate::packet::EnetPacket;
+pub use crate::packet::{EnetPacket, PacketMode};
 pub use crate::peer::EnetPeer;
 
 pub use enet_sys::ENetVersion as EnetVersion;

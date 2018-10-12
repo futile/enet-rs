@@ -1,11 +1,12 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use crate::{EnetAddress, EnetEvent, EnetFailure, EnetKeepAlive};
+use crate::{EnetAddress, EnetEvent, EnetFailure, EnetKeepAlive, EnetPeer};
 
 use enet_sys::{
-    enet_host_bandwidth_limit, enet_host_channel_limit, enet_host_destroy, enet_host_flush,
-    enet_host_service, ENetEvent, ENetHost, ENET_PROTOCOL_MAXIMUM_CHANNEL_COUNT,
+    enet_host_bandwidth_limit, enet_host_channel_limit, enet_host_check_events, enet_host_connect,
+    enet_host_destroy, enet_host_flush, enet_host_service, ENetEvent, ENetHost, ENetPeer,
+    ENET_PROTOCOL_MAXIMUM_CHANNEL_COUNT,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -134,6 +135,7 @@ impl<T> Host<T> {
     ///
     /// This should be called regularly for ENet to work properly with good performance.
     pub fn service(&'_ mut self, timeout_ms: u32) -> Result<Option<EnetEvent<'_, T>>, EnetFailure> {
+        // ENetEvent is Copy (aka has no Drop impl), so we don't have to make sure we `mem::forget` it later on
         let mut sys_event: ENetEvent = unsafe { std::mem::uninitialized() };
 
         let res =
@@ -145,6 +147,49 @@ impl<T> Host<T> {
             r if r < 0 => Err(EnetFailure(r)),
             _ => panic!("unreachable"),
         }
+    }
+
+    /// Checks for any queued events on this `Host` and dispatches one if available
+    pub fn check_events(&'_ mut self) -> Result<Option<EnetEvent<'_, T>>, EnetFailure> {
+        // ENetEvent is Copy (aka has no Drop impl), so we don't have to make sure we `mem::forget` it later on
+        let mut sys_event: ENetEvent = unsafe { std::mem::uninitialized() };
+
+        let res = unsafe { enet_host_check_events(self.inner, &mut sys_event as *mut ENetEvent) };
+
+        match res {
+            r if r > 0 => Ok(EnetEvent::from_sys_event(&sys_event)),
+            0 => Ok(None),
+            r if r < 0 => Err(EnetFailure(r)),
+            _ => panic!("unreachable"),
+        }
+    }
+
+    /// Initiates a connection to a foreign host.
+    ///
+    /// The connection will not be done until a `EnetEvent::Connected` for this peer was received.
+    ///
+    /// `channel_count` specifies how many channels to allocate for this peer.
+    /// `user_data` is a user-specified value that can be chosen arbitrarily.
+    pub fn connect(
+        &mut self,
+        address: &EnetAddress,
+        channel_count: usize,
+        user_data: u32,
+    ) -> Result<EnetPeer<'_, T>, EnetFailure> {
+        let res: *mut ENetPeer = unsafe {
+            enet_host_connect(
+                self.inner,
+                &address.to_enet_address() as *const _,
+                channel_count,
+                user_data,
+            )
+        };
+
+        if res.is_null() {
+            return Err(EnetFailure(0));
+        }
+
+        Ok(EnetPeer::new(res))
     }
 }
 
