@@ -131,6 +131,14 @@ impl<T> Host<T> {
         unsafe { (*self.inner).peerCount }
     }
 
+    /// Returns an iterator over all peers connected to this `Host`.
+    pub fn peers(&'_ mut self) -> impl Iterator<Item = EnetPeer<'_, T>> {
+        let raw_peers =
+            unsafe { std::slice::from_raw_parts_mut((*self.inner).peers, (*self.inner).peerCount) };
+
+        raw_peers.into_iter().map(|rp| EnetPeer::new(rp))
+    }
+
     /// Maintains this host and delivers an event if available.
     ///
     /// This should be called regularly for ENet to work properly with good performance.
@@ -147,6 +155,8 @@ impl<T> Host<T> {
             r if r < 0 => Err(EnetFailure(r)),
             _ => panic!("unreachable"),
         }
+
+        // TODO: check `total*` fields on `inner`, these need to be reset from time to time.
     }
 
     /// Checks for any queued events on this `Host` and dispatches one if available

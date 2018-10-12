@@ -30,6 +30,8 @@
 //!
 //! If you used no unsafe code and the library blows up in your face, that is considered a bug. Please report any bug you encounter via [github](https://github.com/futile/enet-rs).
 
+#![warn(missing_docs)]
+
 #[macro_use]
 extern crate failure_derive;
 

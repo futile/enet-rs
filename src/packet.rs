@@ -52,6 +52,7 @@ impl PacketMode {
 }
 
 impl EnetPacket {
+    /// Creates a new EnetPacket with optional reliability settings.
     pub fn new(data: &[u8], mode: PacketMode) -> Result<EnetPacket, EnetFailure> {
         let res = unsafe {
             enet_packet_create(data.as_ptr() as *const _, data.len(), mode.to_sys_flags())
