@@ -13,12 +13,21 @@ use crate::{EnetAddress, EnetFailure, EnetPacket};
 /// The lifetime of these instances is not really clear from the ENet documentation.
 /// Therefore, `EnetPeer`s are always borrowed, and can not really be stored anywhere.
 ///
-/// Additionally, ENet allows the association of arbitrary data with each peer.
+/// ENet allows the association of arbitrary data with each peer.
 /// The type of this associated data is chosen through `T`.
 pub struct EnetPeer<'a, T: 'a> {
     inner: *mut ENetPeer,
 
     _data: PhantomData<&'a mut T>,
+}
+
+/// A packet received directly from a `Peer`.
+///
+/// Contains the received packet as well as the channel on which it was received.
+pub struct PeerPacket<'b, 'a, T: 'a> {
+    pub packet: EnetPacket,
+    pub channel_id: u8,
+    _priv_guard: PhantomData<&'b EnetPeer<'a, T>>,
 }
 
 impl<'a, T> EnetPeer<'a, T> {
@@ -152,7 +161,7 @@ impl<'a, T> EnetPeer<'a, T> {
     /// Attempts to dequeue an incoming packet from this `Peer`.
     ///
     /// On success, returns the packet and the channel id of the receiving channel.
-    pub fn receive(&mut self) -> Option<(EnetPacket, u8)> {
+    pub fn receive<'b>(&'b mut self) -> Option<PeerPacket<'b, 'a, T>> {
         let mut channel_id = 0u8;
 
         let res = unsafe { enet_peer_receive(self.inner, &mut channel_id as *mut _) };
@@ -161,7 +170,10 @@ impl<'a, T> EnetPeer<'a, T> {
             return None;
         }
 
-        // TODO: this packet might currently live longer than Enet is initialized!
-        Some((EnetPacket::from_sys_packet(res), channel_id))
+        Some(PeerPacket {
+            packet: EnetPacket::from_sys_packet(res),
+            channel_id,
+            _priv_guard: PhantomData,
+        })
     }
 }
