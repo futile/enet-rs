@@ -6,6 +6,7 @@ use enet_sys::{
 use crate::EnetFailure;
 
 /// A packet that can be sent or retrieved on an ENet-connection.
+#[derive(Debug)]
 pub struct EnetPacket {
     inner: *mut ENetPacket,
 }

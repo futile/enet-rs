@@ -137,7 +137,7 @@ impl Enet {
     /// The type `T` specifies the data associated with corresponding `EnetPeer`s.
     pub fn create_host<T>(
         &self,
-        address: &EnetAddress,
+        address: Option<&EnetAddress>,
         max_peer_count: usize,
         max_channel_count: ChannelLimit,
         incoming_bandwidth: BandwidthLimit,
@@ -145,10 +145,13 @@ impl Enet {
     ) -> Result<Host<T>, EnetFailure> {
         use enet_sys::ENetAddress;
 
-        let addr = address.to_enet_address();
+        let addr = address.map(EnetAddress::to_enet_address);
         let inner = unsafe {
             enet_host_create(
-                &addr as *const ENetAddress,
+                // &addr as *const ENetAddress,
+                addr.as_ref()
+                    .map(|p| p as *const _)
+                    .unwrap_or(std::ptr::null()),
                 max_peer_count,
                 max_channel_count.to_enet_usize(),
                 incoming_bandwidth.to_enet_u32(),
@@ -206,7 +209,7 @@ mod tests {
 
         let enet = &ENET;
         enet.create_host::<()>(
-            &EnetAddress::new(Ipv4Addr::LOCALHOST, 12345),
+            Some(&EnetAddress::new(Ipv4Addr::LOCALHOST, 12345)),
             1,
             ChannelLimit::Maximum,
             BandwidthLimit::Unlimited,

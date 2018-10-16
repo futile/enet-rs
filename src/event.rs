@@ -8,6 +8,7 @@ use crate::{EnetPacket, EnetPeer};
 /// This enum represents an event that can occur when servicing an `EnetHost`.
 ///
 /// Also see the official ENet documentation for more information.
+#[derive(Debug)]
 pub enum EnetEvent<'a, T> {
     /// This variant represents the connection of a peer, contained in the only field.
     Connect(EnetPeer<'a, T>),
