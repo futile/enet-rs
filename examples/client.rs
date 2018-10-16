@@ -17,7 +17,7 @@ fn main() {
         )
         .expect("could not create host");
 
-    host.connect(&EnetAddress::new(Ipv4Addr::LOCALHOST, 9001), 10, 0);
+    host.connect(&EnetAddress::new(Ipv4Addr::LOCALHOST, 9001), 10, 0).expect("connect failed");
 
     loop {
         let e = host.service(1000).expect("service failed");

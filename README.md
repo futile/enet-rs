@@ -26,4 +26,5 @@ enet = { git = "https://github.com/futile/enet-rs.git" }
 
 ## Documentation & Examples
 
-Documentation is available by running `cargo doc`. Examples are coming soon.
+Documentation is available by running `cargo doc`. An example server and client
+can be found in the `examples` directory.

@@ -21,7 +21,7 @@
 //! // Deinitialization is handled automatically (using Arc).
 //! ```
 //!
-//! Also check out the examples in the code, as well as the examples from the official ENet website and from the enet-sys crate.
+//! Also check out the examples in the code, as well as the examples from the official ENet website and from the enet-sys crate. There are also an example server and client in the `examples` directory on github.
 //!
 //! # Thread-safety
 //! ENet claims to be "mostly" thread-safe as long as access to individual `Host`-instances is handled in a synchronized manner.
@@ -143,12 +143,9 @@ impl Enet {
         incoming_bandwidth: BandwidthLimit,
         outgoing_bandwidth: BandwidthLimit,
     ) -> Result<Host<T>, EnetFailure> {
-        use enet_sys::ENetAddress;
-
         let addr = address.map(EnetAddress::to_enet_address);
         let inner = unsafe {
             enet_host_create(
-                // &addr as *const ENetAddress,
                 addr.as_ref()
                     .map(|p| p as *const _)
                     .unwrap_or(std::ptr::null()),
