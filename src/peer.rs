@@ -26,8 +26,11 @@ pub struct EnetPeer<'a, T: 'a> {
 ///
 /// Contains the received packet as well as the channel on which it was received.
 pub struct PeerPacket<'b, 'a, T: 'a> {
+    /// The packet that was received.
     pub packet: EnetPacket,
+    /// The channel on which the packet was received.
     pub channel_id: u8,
+
     _priv_guard: PhantomData<&'b EnetPeer<'a, T>>,
 }
 
