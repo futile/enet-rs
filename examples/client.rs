@@ -17,11 +17,40 @@ fn main() {
         )
         .expect("could not create host");
 
-    host.connect(&EnetAddress::new(Ipv4Addr::LOCALHOST, 9001), 10, 0).expect("connect failed");
+    host.connect(&EnetAddress::new(Ipv4Addr::LOCALHOST, 9001), 10, 0)
+        .expect("connect failed");
 
-    loop {
+    let mut peer = loop {
         let e = host.service(1000).expect("service failed");
 
+        let e = match e {
+            Some(ev) => ev,
+            _ => continue,
+        };
+
         println!("[client] event: {:#?}", e);
+
+        match e {
+            EnetEvent::Connect(ref p) => {
+                break p.clone();
+            }
+            EnetEvent::Disconnect(ref p, r) => {
+                println!("connection NOT successful, peer: {:?}, reason: {}", p, r);
+                std::process::exit(0);
+            }
+            EnetEvent::Receive { .. } => {
+                panic!("unexpected Receive-event while waiting for connection")
+            }
+        };
+    };
+
+    peer.send_packet(
+        EnetPacket::new(b"harro", PacketMode::ReliableSequenced).unwrap(),
+        1,
+    ).unwrap();
+
+    loop {
+        let e = host.service(1000).unwrap();
+        println!("received event: {:#?}", e);
     }
 }

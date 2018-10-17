@@ -59,7 +59,7 @@ pub use crate::address::EnetAddress;
 pub use crate::event::EnetEvent;
 pub use crate::host::{BandwidthLimit, ChannelLimit, Host};
 pub use crate::packet::{EnetPacket, PacketMode};
-pub use crate::peer::EnetPeer;
+pub use crate::peer::{EnetPeer, PeerPacket};
 
 pub use enet_sys::ENetVersion as EnetVersion;
 
@@ -132,6 +132,7 @@ impl Enet {
     /// Creates a `Host`. A `Host` is an endpoint of an ENet connection. For more information
     /// consult the official ENet-documentation.
     ///
+    /// `address` specifies the address to listen on. Client-only endpoints can choose `None`.
     /// `max_channel_count` will be set to its (ENet-specified) default value if `None`.
     ///
     /// The type `T` specifies the data associated with corresponding `EnetPeer`s.

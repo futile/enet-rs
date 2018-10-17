@@ -15,7 +15,7 @@ use crate::{EnetAddress, EnetFailure, EnetPacket};
 ///
 /// ENet allows the association of arbitrary data with each peer.
 /// The type of this associated data is chosen through `T`.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct EnetPeer<'a, T: 'a> {
     inner: *mut ENetPeer,
 

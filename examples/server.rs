@@ -20,8 +20,16 @@ fn main() {
         .expect("could not create host");
 
     loop {
-        let e = host.service(1000).expect("service failed");
-
-        println!("[server] event: {:#?}", e);
+        match host.service(1000).expect("service failed") {
+            Some(EnetEvent::Connect(_)) => println!("new connection!"),
+            Some(EnetEvent::Disconnect(..)) => println!("disconnect!"),
+            Some(EnetEvent::Receive {
+                channel_id,
+                ref packet,
+                ..
+            }) => println!("got packet on channel {}, content: '{}'", channel_id,
+                         std::str::from_utf8(packet.data()).unwrap()),
+            _ => (),
+        }
     }
 }
