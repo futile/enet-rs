@@ -44,10 +44,14 @@ fn main() {
         };
     };
 
+    // send a "hello"-like packet
     peer.send_packet(
         EnetPacket::new(b"harro", PacketMode::ReliableSequenced).unwrap(),
         1,
     ).unwrap();
+
+    // disconnect after all outgoing packets have been sent.
+    peer.disconnect_later(5);
 
     loop {
         let e = host.service(1000).unwrap();
