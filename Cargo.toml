@@ -3,6 +3,17 @@ name = "enet"
 version = "0.1.0"
 authors = ["Felix Rath <felixm.rath@gmail.com>"]
 edition = "2018"
+description = "High-level, rust-y bindings to the ENet library"
+documentation = "https://www.docs.rs/enet"
+homepage = "https://github.com/futile/enet-rs"
+repository = "https://github.com/futile/enet-rs"
+readme = "README.md"
+keywords = ["network", "gamedev"]
+categories = ["game-engines", "network-programming"]
+license = "Apache-2.0 OR MIT"
+
+[badges]
+maintenance = { status = "actively-developed" }
 
 [dependencies]
 enet-sys = "0.2.1"
