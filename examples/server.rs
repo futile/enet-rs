@@ -7,7 +7,7 @@ use enet::*;
 fn main() {
     let enet = Enet::new().expect("could not initialize ENet");
 
-    let local_addr = EnetAddress::new(Ipv4Addr::LOCALHOST, 9001);
+    let local_addr = Address::new(Ipv4Addr::LOCALHOST, 9001);
 
     let mut host = enet
         .create_host::<()>(
@@ -21,9 +21,9 @@ fn main() {
 
     loop {
         match host.service(1000).expect("service failed") {
-            Some(EnetEvent::Connect(_)) => println!("new connection!"),
-            Some(EnetEvent::Disconnect(..)) => println!("disconnect!"),
-            Some(EnetEvent::Receive {
+            Some(Event::Connect(_)) => println!("new connection!"),
+            Some(Event::Disconnect(..)) => println!("disconnect!"),
+            Some(Event::Receive {
                 channel_id,
                 ref packet,
                 ..

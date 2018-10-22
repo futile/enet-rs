@@ -9,7 +9,7 @@ other related features. For more information, check out the
 ## Status
 
 For now, this library is **alpha**. It builds on the C-bindings for ENet,
-the [enet-sys crate](https://github.com/ruabmbua/enet-sys). The core
+the [enet-sys crate](https://github.com/ruabmbua/enet-sys). A lot of the
 functionality is there, but not everything. Also, since ENet has
 pretty unclear lifetime semantics, you might actually run into cases where
 things crash. **In those cases, or when something is missing/not yet in the API,

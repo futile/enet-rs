@@ -6,17 +6,17 @@ use enet_sys::{
     enet_peer_reset, enet_peer_send, ENetPeer,
 };
 
-use crate::{EnetAddress, EnetFailure, EnetPacket};
+use crate::{Address, Error, Packet};
 
 /// This struct represents an endpoint in an ENet-connection.
 ///
 /// The lifetime of these instances is not really clear from the ENet documentation.
-/// Therefore, `EnetPeer`s are always borrowed, and can not really be stored anywhere.
+/// Therefore, `Peer`s are always borrowed, and can not really be stored anywhere.
 ///
 /// ENet allows the association of arbitrary data with each peer.
 /// The type of this associated data is chosen through `T`.
 #[derive(Clone, Debug)]
-pub struct EnetPeer<'a, T: 'a> {
+pub struct Peer<'a, T: 'a> {
     inner: *mut ENetPeer,
 
     _data: PhantomData<&'a mut T>,
@@ -27,24 +27,24 @@ pub struct EnetPeer<'a, T: 'a> {
 /// Contains the received packet as well as the channel on which it was received.
 pub struct PeerPacket<'b, 'a, T: 'a> {
     /// The packet that was received.
-    pub packet: EnetPacket,
+    pub packet: Packet,
     /// The channel on which the packet was received.
     pub channel_id: u8,
 
-    _priv_guard: PhantomData<&'b EnetPeer<'a, T>>,
+    _priv_guard: PhantomData<&'b Peer<'a, T>>,
 }
 
-impl<'a, T> EnetPeer<'a, T> {
-    pub(crate) fn new(inner: *mut ENetPeer) -> EnetPeer<'a, T> {
-        EnetPeer {
+impl<'a, T> Peer<'a, T> {
+    pub(crate) fn new(inner: *mut ENetPeer) -> Peer<'a, T> {
+        Peer {
             inner,
             _data: PhantomData,
         }
     }
 
     /// Returns the address of this `Peer`.
-    pub fn address(&self) -> EnetAddress {
-        EnetAddress::from_enet_address(&unsafe { (*self.inner).address })
+    pub fn address(&self) -> Address {
+        Address::from_enet_address(&unsafe { (*self.inner).address })
     }
 
     /// Returns the amout of channels allocated for this `Peer`.
@@ -124,13 +124,13 @@ impl<'a, T> EnetPeer<'a, T> {
     /// Queues a packet to be sent.
     ///
     /// Actual sending will happen during `Host::service`.
-    pub fn send_packet(&mut self, packet: EnetPacket, channel_id: u8) -> Result<(), EnetFailure> {
+    pub fn send_packet(&mut self, packet: Packet, channel_id: u8) -> Result<(), Error> {
         let res = unsafe { enet_peer_send(self.inner, channel_id, packet.into_inner()) };
 
         match res {
             r if r > 0 => panic!("unexpected res: {}", r),
             0 => Ok(()),
-            r if r < 0 => Err(EnetFailure(r)),
+            r if r < 0 => Err(Error(r)),
             _ => panic!("unreachable"),
         }
     }
@@ -175,7 +175,7 @@ impl<'a, T> EnetPeer<'a, T> {
         }
 
         Some(PeerPacket {
-            packet: EnetPacket::from_sys_packet(res),
+            packet: Packet::from_sys_packet(res),
             channel_id,
             _priv_guard: PhantomData,
         })

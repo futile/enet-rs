@@ -21,7 +21,7 @@
 //! // Deinitialization is handled automatically (using Arc).
 //! ```
 //!
-//! Also check out the examples in the code, as well as the examples from the official ENet website and from the enet-sys crate. There are also an example server and client in the `examples` directory on github.
+//! Also check out the examples in the code, as well as the examples from the official ENet website and from the enet-sys crate. There are also an example server and client in the `examples` directory on [github](https://github.com/futile/enet-rs).
 //!
 //! # Thread-safety
 //! ENet claims to be "mostly" thread-safe as long as access to individual `Host`-instances is handled in a synchronized manner.
@@ -55,11 +55,11 @@ mod host;
 mod packet;
 mod peer;
 
-pub use crate::address::EnetAddress;
-pub use crate::event::EnetEvent;
+pub use crate::address::Address;
+pub use crate::event::Event;
 pub use crate::host::{BandwidthLimit, ChannelLimit, Host};
-pub use crate::packet::{EnetPacket, PacketMode};
-pub use crate::peer::{EnetPeer, PeerPacket};
+pub use crate::packet::{Packet, PacketMode};
+pub use crate::peer::{Peer, PeerPacket};
 
 pub use enet_sys::ENetVersion as EnetVersion;
 
@@ -89,7 +89,7 @@ pub struct Enet {
 /// Contains the return value of the failed function call.
 #[derive(Fail, Debug)]
 #[fail(display = "enet failure, returned '{}'", _0)]
-pub struct EnetFailure(pub c_int);
+pub struct Error(pub c_int);
 
 /// An error that can occur when initializing ENet.
 #[derive(Fail, Debug)]
@@ -102,7 +102,7 @@ pub enum InitializationError {
     AlreadyDeinitialized,
     /// Internal ENet failure (`enet_initialize` failed), containing the return code.
     #[fail(display = "enet_initialize failed (with '{}')", _0)]
-    EnetFailure(c_int),
+    Error(c_int),
 }
 
 impl Enet {
@@ -121,7 +121,7 @@ impl Enet {
         let r = unsafe { enet_initialize() };
 
         if r != 0 {
-            return Err(InitializationError::EnetFailure(r));
+            return Err(InitializationError::Error(r));
         }
 
         Ok(Enet {
@@ -135,16 +135,16 @@ impl Enet {
     /// `address` specifies the address to listen on. Client-only endpoints can choose `None`.
     /// `max_channel_count` will be set to its (ENet-specified) default value if `None`.
     ///
-    /// The type `T` specifies the data associated with corresponding `EnetPeer`s.
+    /// The type `T` specifies the data associated with corresponding `Peer`s.
     pub fn create_host<T>(
         &self,
-        address: Option<&EnetAddress>,
+        address: Option<&Address>,
         max_peer_count: usize,
         max_channel_count: ChannelLimit,
         incoming_bandwidth: BandwidthLimit,
         outgoing_bandwidth: BandwidthLimit,
-    ) -> Result<Host<T>, EnetFailure> {
-        let addr = address.map(EnetAddress::to_enet_address);
+    ) -> Result<Host<T>, Error> {
+        let addr = address.map(Address::to_enet_address);
         let inner = unsafe {
             enet_host_create(
                 addr.as_ref()
@@ -158,7 +158,7 @@ impl Enet {
         };
 
         if inner.is_null() {
-            return Err(EnetFailure(0));
+            return Err(Error(0));
         }
 
         Ok(Host::new(self.keep_alive.clone(), inner))
@@ -202,12 +202,12 @@ mod tests {
 
     #[test]
     fn test_host_create_localhost() {
-        use crate::EnetAddress;
+        use crate::Address;
         use std::net::Ipv4Addr;
 
         let enet = &ENET;
         enet.create_host::<()>(
-            Some(&EnetAddress::new(Ipv4Addr::LOCALHOST, 12345)),
+            Some(&Address::new(Ipv4Addr::LOCALHOST, 12345)),
             1,
             ChannelLimit::Maximum,
             BandwidthLimit::Unlimited,

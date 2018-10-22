@@ -3,11 +3,11 @@ use enet_sys::{
     _ENetPacketFlag_ENET_PACKET_FLAG_UNSEQUENCED,
 };
 
-use crate::EnetFailure;
+use crate::Error;
 
 /// A packet that can be sent or retrieved on an ENet-connection.
 #[derive(Debug)]
-pub struct EnetPacket {
+pub struct Packet {
     inner: *mut ENetPacket,
 }
 
@@ -52,22 +52,22 @@ impl PacketMode {
     }
 }
 
-impl EnetPacket {
-    /// Creates a new EnetPacket with optional reliability settings.
-    pub fn new(data: &[u8], mode: PacketMode) -> Result<EnetPacket, EnetFailure> {
+impl Packet {
+    /// Creates a new Packet with optional reliability settings.
+    pub fn new(data: &[u8], mode: PacketMode) -> Result<Packet, Error> {
         let res = unsafe {
             enet_packet_create(data.as_ptr() as *const _, data.len(), mode.to_sys_flags())
         };
 
         if res.is_null() {
-            return Err(EnetFailure(0));
+            return Err(Error(0));
         }
 
-        Ok(EnetPacket::from_sys_packet(res))
+        Ok(Packet::from_sys_packet(res))
     }
 
-    pub(crate) fn from_sys_packet(inner: *mut ENetPacket) -> EnetPacket {
-        EnetPacket { inner }
+    pub(crate) fn from_sys_packet(inner: *mut ENetPacket) -> Packet {
+        Packet { inner }
     }
 
     /// Does NOT run this `Packet`'s destructor.
@@ -83,7 +83,7 @@ impl EnetPacket {
     }
 }
 
-impl Drop for EnetPacket {
+impl Drop for Packet {
     fn drop(&mut self) {
         unsafe {
             enet_packet_destroy(self.inner);

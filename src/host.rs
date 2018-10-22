@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use crate::{EnetAddress, EnetEvent, EnetFailure, EnetKeepAlive, EnetPeer};
+use crate::{Address, Event, Error, EnetKeepAlive, Peer};
 
 use enet_sys::{
     enet_host_bandwidth_limit, enet_host_channel_limit, enet_host_check_events, enet_host_connect,
@@ -122,8 +122,8 @@ impl<T> Host<T> {
     }
 
     /// Returns the internet address of this `Host`.
-    pub fn address(&self) -> EnetAddress {
-        EnetAddress::from_enet_address(&unsafe { (*self.inner).address })
+    pub fn address(&self) -> Address {
+        Address::from_enet_address(&unsafe { (*self.inner).address })
     }
 
     /// Returns the number of peers allocated for this `Host`.
@@ -132,17 +132,17 @@ impl<T> Host<T> {
     }
 
     /// Returns an iterator over all peers connected to this `Host`.
-    pub fn peers(&'_ mut self) -> impl Iterator<Item = EnetPeer<'_, T>> {
+    pub fn peers(&'_ mut self) -> impl Iterator<Item = Peer<'_, T>> {
         let raw_peers =
             unsafe { std::slice::from_raw_parts_mut((*self.inner).peers, (*self.inner).peerCount) };
 
-        raw_peers.into_iter().map(|rp| EnetPeer::new(rp))
+        raw_peers.into_iter().map(|rp| Peer::new(rp))
     }
 
     /// Maintains this host and delivers an event if available.
     ///
     /// This should be called regularly for ENet to work properly with good performance.
-    pub fn service(&'_ mut self, timeout_ms: u32) -> Result<Option<EnetEvent<'_, T>>, EnetFailure> {
+    pub fn service(&'_ mut self, timeout_ms: u32) -> Result<Option<Event<'_, T>>, Error> {
         // ENetEvent is Copy (aka has no Drop impl), so we don't have to make sure we `mem::forget` it later on
         let mut sys_event: ENetEvent = unsafe { std::mem::uninitialized() };
 
@@ -150,9 +150,9 @@ impl<T> Host<T> {
             unsafe { enet_host_service(self.inner, &mut sys_event as *mut ENetEvent, timeout_ms) };
 
         match res {
-            r if r > 0 => Ok(EnetEvent::from_sys_event(&sys_event)),
+            r if r > 0 => Ok(Event::from_sys_event(&sys_event)),
             0 => Ok(None),
-            r if r < 0 => Err(EnetFailure(r)),
+            r if r < 0 => Err(Error(r)),
             _ => panic!("unreachable"),
         }
 
@@ -160,32 +160,32 @@ impl<T> Host<T> {
     }
 
     /// Checks for any queued events on this `Host` and dispatches one if available
-    pub fn check_events(&'_ mut self) -> Result<Option<EnetEvent<'_, T>>, EnetFailure> {
+    pub fn check_events(&'_ mut self) -> Result<Option<Event<'_, T>>, Error> {
         // ENetEvent is Copy (aka has no Drop impl), so we don't have to make sure we `mem::forget` it later on
         let mut sys_event: ENetEvent = unsafe { std::mem::uninitialized() };
 
         let res = unsafe { enet_host_check_events(self.inner, &mut sys_event as *mut ENetEvent) };
 
         match res {
-            r if r > 0 => Ok(EnetEvent::from_sys_event(&sys_event)),
+            r if r > 0 => Ok(Event::from_sys_event(&sys_event)),
             0 => Ok(None),
-            r if r < 0 => Err(EnetFailure(r)),
+            r if r < 0 => Err(Error(r)),
             _ => panic!("unreachable"),
         }
     }
 
     /// Initiates a connection to a foreign host.
     ///
-    /// The connection will not be done until a `EnetEvent::Connected` for this peer was received.
+    /// The connection will not be done until a `Event::Connected` for this peer was received.
     ///
     /// `channel_count` specifies how many channels to allocate for this peer.
     /// `user_data` is a user-specified value that can be chosen arbitrarily.
     pub fn connect(
         &mut self,
-        address: &EnetAddress,
+        address: &Address,
         channel_count: usize,
         user_data: u32,
-    ) -> Result<EnetPeer<'_, T>, EnetFailure> {
+    ) -> Result<Peer<'_, T>, Error> {
         let res: *mut ENetPeer = unsafe {
             enet_host_connect(
                 self.inner,
@@ -196,10 +196,10 @@ impl<T> Host<T> {
         };
 
         if res.is_null() {
-            return Err(EnetFailure(0));
+            return Err(Error(0));
         }
 
-        Ok(EnetPeer::new(res))
+        Ok(Peer::new(res))
     }
 }
 
