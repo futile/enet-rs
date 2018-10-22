@@ -1,5 +1,9 @@
 # High-Level, Rust-y Bindings for the ENet library
 
+![Documentation](https://docs.rs/enet/badge.svg)
+![Crates.io](https://img.shields.io/crates/v/enet.svg)
+![License](https://img.shields.io/crates/l/enet.svg)
+
 This crate aims to provide high-level, rust-y bindings for the ENet library.
 ENet is a networking library for games that builds on UDP,
 offering optional reliability, congestion control, connection-orientation and
