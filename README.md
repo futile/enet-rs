@@ -1,8 +1,8 @@
 # High-Level, Rust-y Bindings for the ENet library
 
-![Documentation](https://docs.rs/enet/badge.svg)
-![Crates.io](https://img.shields.io/crates/v/enet.svg)
-![License](https://img.shields.io/crates/l/enet.svg)
+[![Documentation](https://docs.rs/enet/badge.svg)](https://docs.rs/enet)
+[![Crates.io](https://img.shields.io/crates/v/enet.svg)](https://crates.io/crates/enet)
+[![License](https://img.shields.io/crates/l/enet.svg)](https://github.com/futile/enet-rs)
 
 This crate aims to provide high-level, rust-y bindings for the ENet library.
 ENet is a networking library for games that builds on UDP,
