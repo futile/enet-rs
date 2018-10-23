@@ -21,11 +21,16 @@ open a bug report, and I will look into it as soon as possible.**
 
 ## Usage
 
-Not yet on crates.io. For now, use:
+To check what the latest released version is, check on
+[https://crates.io/crates/enet](crates.io), or use `cargo add` from 
+[cargo edit](https://github.com/killercup/cargo-edit) to automatically add a
+dependency to the most recent version.
+
+Installation is as simple as adding this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-enet = { git = "https://github.com/futile/enet-rs.git" }
+enet = "0.1"
 ```
 
 ## Documentation & Examples
