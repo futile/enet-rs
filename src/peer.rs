@@ -4,6 +4,17 @@ use std::time::Duration;
 use enet_sys::{
     enet_peer_disconnect, enet_peer_disconnect_later, enet_peer_disconnect_now, enet_peer_receive,
     enet_peer_reset, enet_peer_send, ENetPeer,
+    _ENetPeerState,
+    _ENetPeerState_ENET_PEER_STATE_DISCONNECTED,
+    _ENetPeerState_ENET_PEER_STATE_CONNECTING,
+    _ENetPeerState_ENET_PEER_STATE_ACKNOWLEDGING_CONNECT,
+    _ENetPeerState_ENET_PEER_STATE_CONNECTION_PENDING,
+    _ENetPeerState_ENET_PEER_STATE_CONNECTION_SUCCEEDED,
+    _ENetPeerState_ENET_PEER_STATE_CONNECTED,
+    _ENetPeerState_ENET_PEER_STATE_DISCONNECT_LATER,
+    _ENetPeerState_ENET_PEER_STATE_DISCONNECTING,
+    _ENetPeerState_ENET_PEER_STATE_ACKNOWLEDGING_DISCONNECT,
+    _ENetPeerState_ENET_PEER_STATE_ZOMBIE,
 };
 
 use crate::{Address, Error, Packet};
@@ -25,6 +36,7 @@ pub struct Peer<'a, T: 'a> {
 /// A packet received directly from a `Peer`.
 ///
 /// Contains the received packet as well as the channel on which it was received.
+#[derive(Debug)]
 pub struct PeerPacket<'b, 'a, T: 'a> {
     /// The packet that was received.
     pub packet: Packet,
@@ -32,6 +44,43 @@ pub struct PeerPacket<'b, 'a, T: 'a> {
     pub channel_id: u8,
 
     _priv_guard: PhantomData<&'b Peer<'a, T>>,
+}
+
+/// Describes the state a `Peer` is in.
+///
+/// The states should be self-explanatory, ENet doesn't explain them more either.
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+#[allow(missing_docs)]
+pub enum PeerState {
+    Disconnected,
+    Connected,
+    Connecting,
+    AcknowledgingConnect,
+    ConnectionPending,
+    ConnectionSucceeded,
+    DisconnectLater,
+    Disconnecting,
+    AcknowledgingDisconnect,
+    Zombie,
+}
+
+impl PeerState {
+    fn from_sys_state(enet_sys_state: _ENetPeerState) -> PeerState {
+        #[allow(non_upper_case_globals)]
+        match enet_sys_state {
+            _ENetPeerState_ENET_PEER_STATE_DISCONNECTED => PeerState::Disconnected,
+            _ENetPeerState_ENET_PEER_STATE_CONNECTING => PeerState::Connecting,
+            _ENetPeerState_ENET_PEER_STATE_ACKNOWLEDGING_CONNECT => PeerState::AcknowledgingConnect,
+            _ENetPeerState_ENET_PEER_STATE_CONNECTION_PENDING => PeerState::ConnectionPending,
+            _ENetPeerState_ENET_PEER_STATE_CONNECTION_SUCCEEDED => PeerState::ConnectionSucceeded,
+            _ENetPeerState_ENET_PEER_STATE_CONNECTED => PeerState::Connected,
+            _ENetPeerState_ENET_PEER_STATE_DISCONNECT_LATER => PeerState::DisconnectLater,
+            _ENetPeerState_ENET_PEER_STATE_DISCONNECTING => PeerState::Disconnecting,
+            _ENetPeerState_ENET_PEER_STATE_ACKNOWLEDGING_DISCONNECT => PeerState::AcknowledgingDisconnect,
+            _ENetPeerState_ENET_PEER_STATE_ZOMBIE => PeerState::Zombie,
+            val => panic!("unexpected peer state: {}", val),
+        }
+    }
 }
 
 impl<'a, T> Peer<'a, T> {
@@ -119,6 +168,11 @@ impl<'a, T> Peer<'a, T> {
         unsafe {
             enet_peer_reset(self.inner);
         }
+    }
+
+    /// Returns the state this `Peer` is in.
+    pub fn state(&self) -> PeerState {
+        PeerState::from_sys_state(unsafe {(*self.inner).state})
     }
 
     /// Queues a packet to be sent.
