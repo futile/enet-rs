@@ -66,7 +66,7 @@ impl<'a, T> Peer<'a, T> {
     }
 
     /// Returns a mutable reference to the data associated with this `Peer`, if set.
-    pub fn data_mut(&self) -> Option<&mut T> {
+    pub fn data_mut(&mut self) -> Option<&mut T> {
         unsafe {
             let raw_data = (*self.inner).data as *mut T;
 
