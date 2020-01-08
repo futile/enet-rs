@@ -2,11 +2,11 @@ use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::sync::Arc;
 
-use crate::{Address, EnetKeepAlive, Error, Event, Peer};
+use crate::{Address, EnetKeepAlive, Error, Event, EventKind, Peer};
 
 use enet_sys::{
     enet_host_bandwidth_limit, enet_host_channel_limit, enet_host_check_events, enet_host_connect,
-    enet_host_destroy, enet_host_flush, enet_host_service, ENetHost, ENetPeer,
+    enet_host_destroy, enet_host_flush, enet_host_service, ENetEvent, ENetHost, ENetPeer,
     ENET_PROTOCOL_MAXIMUM_CHANNEL_COUNT,
 };
 
@@ -60,7 +60,7 @@ impl BandwidthLimit {
 /// This type provides functionality such as connection establishment and packet transmission.
 pub struct Host<T> {
     inner: *mut ENetHost,
-
+    disconnect_drop: Option<usize>,
     _keep_alive: Arc<EnetKeepAlive>,
     _peer_data: PhantomData<*const T>,
 }
@@ -71,6 +71,7 @@ impl<T> Host<T> {
 
         Host {
             inner,
+            disconnect_drop: None,
             _keep_alive,
             _peer_data: PhantomData,
         }
@@ -132,6 +133,28 @@ impl<T> Host<T> {
         unsafe { (*self.inner).peerCount }
     }
 
+    /// Returns a mutable reference to a peer at the index, None if the index is invalid.
+    pub fn peer_mut(&mut self, idx: usize) -> Option<&mut Peer<T>> {
+        if idx >= self.peer_count() {
+            return None;
+        }
+
+        Some(Peer::new_mut(unsafe {
+            &mut *((*self.inner).peers.offset(idx as isize))
+        }))
+    }
+
+    /// Returns a reference to a peer at the index, None if the index is invalid.
+    pub fn peer(&self, idx: usize) -> Option<&Peer<T>> {
+        if idx >= self.peer_count() {
+            return None;
+        }
+
+        Some(Peer::new(unsafe {
+            &*((*self.inner).peers.offset(idx as isize))
+        }))
+    }
+
     /// Returns an iterator over all peers connected to this `Host`.
     pub fn peers_mut(&mut self) -> impl Iterator<Item = &'_ mut Peer<T>> {
         let peers =
@@ -141,11 +164,30 @@ impl<T> Host<T> {
     }
 
     /// Returns an iterator over all peers connected to this `Host`.
-    pub fn peers(&'_ self) -> impl Iterator<Item = &'_ Peer<T>> {
+    pub fn peers(&self) -> impl Iterator<Item = &'_ Peer<T>> {
         let peers =
             unsafe { std::slice::from_raw_parts((*self.inner).peers, (*self.inner).peerCount) };
 
         peers.into_iter().map(|peer| Peer::new(&*peer))
+    }
+
+    fn drop_disconnected(&mut self) {
+        if let Some(idx) = self.disconnect_drop.take() {
+            Peer::<T>::new_mut(unsafe { &mut *((*self.inner).peers.offset(idx as isize)) })
+                .set_data(None);
+        }
+    }
+
+    fn process_event(&mut self, sys_event: ENetEvent) -> Option<Event<'_, T>> {
+        self.drop_disconnected();
+
+        let event = Event::from_sys_event(&sys_event);
+        if let Some(EventKind::Disconnect { .. }) = event.as_ref().map(|event| &event.kind) {
+            self.disconnect_drop =
+                Some(unsafe { sys_event.peer as usize - (*self.inner).peers as usize });
+        }
+
+        event
     }
 
     /// Maintains this host and delivers an event if available.
@@ -158,7 +200,7 @@ impl<T> Host<T> {
         let res = unsafe { enet_host_service(self.inner, sys_event.as_mut_ptr(), timeout_ms) };
 
         match res {
-            r if r > 0 => Ok(Event::from_sys_event(unsafe { &sys_event.assume_init() })),
+            r if r > 0 => Ok(unsafe { self.process_event(sys_event.assume_init()) }),
             0 => Ok(None),
             r if r < 0 => Err(Error(r)),
             _ => panic!("unreachable"),
@@ -175,7 +217,7 @@ impl<T> Host<T> {
         let res = unsafe { enet_host_check_events(self.inner, sys_event.as_mut_ptr()) };
 
         match res {
-            r if r > 0 => Ok(Event::from_sys_event(unsafe { &sys_event.assume_init() })),
+            r if r > 0 => Ok(unsafe { self.process_event(sys_event.assume_init()) }),
             0 => Ok(None),
             r if r < 0 => Err(Error(r)),
             _ => panic!("unreachable"),
@@ -214,6 +256,8 @@ impl<T> Host<T> {
 impl<T> Drop for Host<T> {
     /// Call the corresponding ENet cleanup-function(s).
     fn drop(&mut self) {
+        self.drop_disconnected();
+
         unsafe {
             enet_host_destroy(self.inner);
         }

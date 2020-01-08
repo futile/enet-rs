@@ -56,7 +56,7 @@ mod packet;
 mod peer;
 
 pub use crate::address::Address;
-pub use crate::event::Event;
+pub use crate::event::{Event, EventKind};
 pub use crate::host::{BandwidthLimit, ChannelLimit, Host};
 pub use crate::packet::{Packet, PacketMode};
 pub use crate::peer::{Peer, PeerState};
