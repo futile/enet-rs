@@ -1,5 +1,6 @@
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
+use std::ops::{Index, IndexMut};
 use std::sync::Arc;
 
 use crate::{Address, EnetKeepAlive, Error, Event, EventKind, Peer};
@@ -250,6 +251,20 @@ impl<T> Host<T> {
         }
 
         Ok(Peer::new_mut(unsafe { &mut *res }))
+    }
+}
+
+impl<T> Index<usize> for Host<T> {
+    type Output = Peer<T>;
+
+    fn index(&self, idx: usize) -> &Peer<T> {
+        self.peer(idx).expect("invalid peer index")
+    }
+}
+
+impl<T> IndexMut<usize> for Host<T> {
+    fn index_mut(&mut self, idx: usize) -> &mut Peer<T> {
+        self.peer_mut(idx).expect("invalid peer index")
     }
 }
 
