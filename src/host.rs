@@ -133,11 +133,19 @@ impl<T> Host<T> {
     }
 
     /// Returns an iterator over all peers connected to this `Host`.
-    pub fn peers(&'_ mut self) -> impl Iterator<Item = Peer<'_, T>> {
-        let raw_peers =
+    pub fn peers_mut(&'_ mut self) -> impl Iterator<Item = &'_ mut Peer<T>> {
+        let peers =
             unsafe { std::slice::from_raw_parts_mut((*self.inner).peers, (*self.inner).peerCount) };
 
-        raw_peers.into_iter().map(|rp| Peer::new(rp))
+        peers.into_iter().map(|peer| Peer::new_mut(&mut *peer))
+    }
+
+    /// Returns an iterator over all peers connected to this `Host`.
+    pub fn peers(&'_ self) -> impl Iterator<Item = &'_ Peer<T>> {
+        let peers =
+            unsafe { std::slice::from_raw_parts((*self.inner).peers, (*self.inner).peerCount) };
+
+        peers.into_iter().map(|peer| Peer::new(&*peer))
     }
 
     /// Maintains this host and delivers an event if available.
@@ -185,7 +193,7 @@ impl<T> Host<T> {
         address: &Address,
         channel_count: usize,
         user_data: u32,
-    ) -> Result<Peer<'_, T>, Error> {
+    ) -> Result<&mut Peer<T>, Error> {
         let res: *mut ENetPeer = unsafe {
             enet_host_connect(
                 self.inner,
@@ -199,7 +207,7 @@ impl<T> Host<T> {
             return Err(Error(0));
         }
 
-        Ok(Peer::new(res))
+        Ok(Peer::new_mut(unsafe { &mut *res }))
     }
 }
 
