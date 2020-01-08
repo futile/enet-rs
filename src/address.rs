@@ -23,7 +23,7 @@ impl Address {
 
     /// Create a new address from a given hostname.
     pub fn from_hostname(hostname: &CString, port: u16) -> Result<Address, Error> {
-        use enet_sys::{enet_address_set_host};
+        use enet_sys::enet_address_set_host;
 
         let mut addr = ENetAddress { host: 0, port };
 

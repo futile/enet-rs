@@ -1,11 +1,12 @@
 use std::marker::PhantomData;
+use std::mem::MaybeUninit;
 use std::sync::Arc;
 
-use crate::{Address, Event, Error, EnetKeepAlive, Peer};
+use crate::{Address, EnetKeepAlive, Error, Event, Peer};
 
 use enet_sys::{
     enet_host_bandwidth_limit, enet_host_channel_limit, enet_host_check_events, enet_host_connect,
-    enet_host_destroy, enet_host_flush, enet_host_service, ENetEvent, ENetHost, ENetPeer,
+    enet_host_destroy, enet_host_flush, enet_host_service, ENetHost, ENetPeer,
     ENET_PROTOCOL_MAXIMUM_CHANNEL_COUNT,
 };
 
@@ -144,13 +145,12 @@ impl<T> Host<T> {
     /// This should be called regularly for ENet to work properly with good performance.
     pub fn service(&'_ mut self, timeout_ms: u32) -> Result<Option<Event<'_, T>>, Error> {
         // ENetEvent is Copy (aka has no Drop impl), so we don't have to make sure we `mem::forget` it later on
-        let mut sys_event: ENetEvent = unsafe { std::mem::uninitialized() };
+        let mut sys_event = MaybeUninit::uninit();
 
-        let res =
-            unsafe { enet_host_service(self.inner, &mut sys_event as *mut ENetEvent, timeout_ms) };
+        let res = unsafe { enet_host_service(self.inner, sys_event.as_mut_ptr(), timeout_ms) };
 
         match res {
-            r if r > 0 => Ok(Event::from_sys_event(&sys_event)),
+            r if r > 0 => Ok(Event::from_sys_event(unsafe { &sys_event.assume_init() })),
             0 => Ok(None),
             r if r < 0 => Err(Error(r)),
             _ => panic!("unreachable"),
@@ -162,12 +162,12 @@ impl<T> Host<T> {
     /// Checks for any queued events on this `Host` and dispatches one if available
     pub fn check_events(&'_ mut self) -> Result<Option<Event<'_, T>>, Error> {
         // ENetEvent is Copy (aka has no Drop impl), so we don't have to make sure we `mem::forget` it later on
-        let mut sys_event: ENetEvent = unsafe { std::mem::uninitialized() };
+        let mut sys_event = MaybeUninit::uninit();
 
-        let res = unsafe { enet_host_check_events(self.inner, &mut sys_event as *mut ENetEvent) };
+        let res = unsafe { enet_host_check_events(self.inner, sys_event.as_mut_ptr()) };
 
         match res {
-            r if r > 0 => Ok(Event::from_sys_event(&sys_event)),
+            r if r > 0 => Ok(Event::from_sys_event(unsafe { &sys_event.assume_init() })),
             0 => Ok(None),
             r if r < 0 => Err(Error(r)),
             _ => panic!("unreachable"),
