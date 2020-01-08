@@ -20,7 +20,11 @@ fn main() {
         .expect("could not create host");
 
     loop {
-        if let Some(Event { peer, kind }) = host.service(None).expect("service failed") {
+        // Wait 500 ms for any events.
+        if let Some(Event { peer, kind }) = host
+            .service(Duration::from_millis(500))
+            .expect("service failed")
+        {
             match kind {
                 EventKind::Connect => println!("new connection!"),
                 EventKind::Disconnect { .. } => println!("disconnect!"),
