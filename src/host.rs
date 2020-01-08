@@ -256,7 +256,9 @@ impl<T> Host<T> {
 impl<T> Drop for Host<T> {
     /// Call the corresponding ENet cleanup-function(s).
     fn drop(&mut self) {
-        self.drop_disconnected();
+        for peer in self.peers_mut() {
+            peer.set_data(None);
+        }
 
         unsafe {
             enet_host_destroy(self.inner);
