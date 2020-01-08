@@ -20,16 +20,16 @@ fn main() {
         .expect("could not create host");
 
     loop {
-        match host.service(1000).expect("service failed") {
-            Some(Event::Connect(_)) => println!("new connection!"),
-            Some(Event::Disconnect(..)) => println!("disconnect!"),
-            Some(Event::Receive {
-                channel_id,
-                ref packet,
-                ..
-            }) => println!("got packet on channel {}, content: '{}'", channel_id,
-                         std::str::from_utf8(packet.data()).unwrap()),
-            _ => (),
+        if let Some(Event { peer, kind }) = host.service(None).expect("service failed") {
+            match kind {
+                EventKind::Connect => println!("new connection!"),
+                EventKind::Disconnect { .. } => println!("disconnect!"),
+                EventKind::Receive { channel_id, packet } => println!(
+                    "got packet on channel {}, content: '{}'",
+                    channel_id,
+                    std::str::from_utf8(packet.data()).unwrap()
+                ),
+            }
         }
     }
 }

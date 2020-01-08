@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::ops::{Index, IndexMut};
 use std::sync::Arc;
+use std::time::Duration;
 
 use crate::{Address, EnetKeepAlive, Error, Event, EventKind, Peer};
 
@@ -194,11 +195,19 @@ impl<T> Host<T> {
     /// Maintains this host and delivers an event if available.
     ///
     /// This should be called regularly for ENet to work properly with good performance.
-    pub fn service(&mut self, timeout_ms: u32) -> Result<Option<Event<'_, T>>, Error> {
+    ///
+    /// The function won't block for less than 1ms.
+    pub fn service(&mut self, timeout: Duration) -> Result<Option<Event<'_, T>>, Error> {
         // ENetEvent is Copy (aka has no Drop impl), so we don't have to make sure we `mem::forget` it later on
         let mut sys_event = MaybeUninit::uninit();
 
-        let res = unsafe { enet_host_service(self.inner, sys_event.as_mut_ptr(), timeout_ms) };
+        let res = unsafe {
+            enet_host_service(
+                self.inner,
+                sys_event.as_mut_ptr(),
+                timeout.as_millis() as u32,
+            )
+        };
 
         match res {
             r if r > 0 => Ok(unsafe { self.process_event(sys_event.assume_init()) }),
