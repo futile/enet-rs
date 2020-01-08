@@ -14,14 +14,23 @@ pub struct Event<'a, T> {
     pub kind: EventKind,
 }
 
+/// The type of an event.
 #[derive(Debug)]
 pub enum EventKind {
     /// Peer has connected.
     Connect,
     /// Peer has disconnected.
-    Disconnect { data: u32 },
+    Disconnect {
+        /// The data associated with this event. Usually a reason for disconnection.
+        data: u32,
+    },
     /// Peer has received a packet.
-    Receive { channel_id: u8, packet: Packet },
+    Receive {
+        /// ID of the channel that the packet was received on.
+        channel_id: u8,
+        /// The received packet.
+        packet: Packet,
+    },
 }
 
 impl<'a, T> Event<'a, T> {
