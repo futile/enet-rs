@@ -7,6 +7,7 @@ use enet_sys::{
 use crate::{Packet, Peer};
 
 /// This struct represents an event that can occur when servicing an `EnetHost`.
+#[derive(Debug)]
 pub struct Event<'a, T> {
     /// The peer that this event happened on.
     pub peer: &'a mut Peer<T>,

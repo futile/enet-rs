@@ -1,3 +1,4 @@
+use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
 use std::time::Duration;
 
@@ -163,6 +164,15 @@ where
         unsafe {
             enet_peer_disconnect_later(&mut self.inner as *mut _, user_data);
         }
+    }
+}
+
+impl<T> Debug for Peer<T>
+where
+    T: Debug,
+{
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("Peer").field("data", &self.data()).finish()
     }
 }
 
