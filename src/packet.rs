@@ -1,5 +1,6 @@
 use enet_sys::{
-    enet_packet_create, enet_packet_destroy, ENetPacket, _ENetPacketFlag_ENET_PACKET_FLAG_RELIABLE,
+    enet_packet_create, enet_packet_destroy, ENetPacket,
+    _ENetPacketFlag_ENET_PACKET_FLAG_NO_ALLOCATE, _ENetPacketFlag_ENET_PACKET_FLAG_RELIABLE,
     _ENetPacketFlag_ENET_PACKET_FLAG_UNSEQUENCED,
 };
 
@@ -46,7 +47,9 @@ impl PacketMode {
     fn to_sys_flags(&self) -> u32 {
         match self {
             PacketMode::UnreliableSequenced => 0,
-            PacketMode::UnreliableUnsequenced => _ENetPacketFlag_ENET_PACKET_FLAG_UNSEQUENCED as u32,
+            PacketMode::UnreliableUnsequenced => {
+                _ENetPacketFlag_ENET_PACKET_FLAG_UNSEQUENCED as u32
+            }
             PacketMode::ReliableSequenced => _ENetPacketFlag_ENET_PACKET_FLAG_RELIABLE as u32,
         }
     }
@@ -54,14 +57,25 @@ impl PacketMode {
 
 impl Packet {
     /// Creates a new Packet with optional reliability settings.
-    pub fn new(data: &[u8], mode: PacketMode) -> Result<Packet, Error> {
+    pub fn new(data: Vec<u8>, mode: PacketMode) -> Result<Packet, Error> {
         let res = unsafe {
-            enet_packet_create(data.as_ptr() as *const _, data.len(), mode.to_sys_flags())
+            enet_packet_create(
+                data.as_ptr() as *const _,
+                data.len(),
+                mode.to_sys_flags() | _ENetPacketFlag_ENET_PACKET_FLAG_NO_ALLOCATE,
+            )
         };
 
         if res.is_null() {
             return Err(Error(0));
         }
+
+        unsafe {
+            (*res).userData = data.capacity() as *mut _;
+            (*res).freeCallback = Some(packet_free_callback);
+        }
+
+        drop(data);
 
         Ok(Packet::from_sys_packet(res))
     }
@@ -89,4 +103,12 @@ impl Drop for Packet {
             enet_packet_destroy(self.inner);
         }
     }
+}
+
+unsafe extern "C" fn packet_free_callback(packet: *mut ENetPacket) {
+    Vec::from_raw_parts(
+        (*packet).data,
+        (*packet).dataLength,
+        (*packet).userData as usize,
+    );
 }
