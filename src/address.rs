@@ -1,8 +1,6 @@
 use std::ffi::CString;
 use std::net::{Ipv4Addr, SocketAddrV4};
 
-use byteorder::{NetworkEndian, ReadBytesExt};
-
 use crate::Error;
 
 use enet_sys::ENetAddress;
@@ -52,10 +50,7 @@ impl Address {
 
     pub(crate) fn to_enet_address(&self) -> ENetAddress {
         ENetAddress {
-            host: (&self.ip().octets() as &[u8])
-                .read_u32::<NetworkEndian>()
-                .unwrap()
-                .to_be(),
+            host: u32::from_be_bytes(self.ip().octets()).to_be(),
             port: self.port(),
         }
     }
