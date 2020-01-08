@@ -133,7 +133,7 @@ impl<T> Host<T> {
     }
 
     /// Returns an iterator over all peers connected to this `Host`.
-    pub fn peers_mut(&'_ mut self) -> impl Iterator<Item = &'_ mut Peer<T>> {
+    pub fn peers_mut(&mut self) -> impl Iterator<Item = &'_ mut Peer<T>> {
         let peers =
             unsafe { std::slice::from_raw_parts_mut((*self.inner).peers, (*self.inner).peerCount) };
 
@@ -151,7 +151,7 @@ impl<T> Host<T> {
     /// Maintains this host and delivers an event if available.
     ///
     /// This should be called regularly for ENet to work properly with good performance.
-    pub fn service(&'_ mut self, timeout_ms: u32) -> Result<Option<Event<'_, T>>, Error> {
+    pub fn service(&mut self, timeout_ms: u32) -> Result<Option<Event<'_, T>>, Error> {
         // ENetEvent is Copy (aka has no Drop impl), so we don't have to make sure we `mem::forget` it later on
         let mut sys_event = MaybeUninit::uninit();
 
@@ -168,7 +168,7 @@ impl<T> Host<T> {
     }
 
     /// Checks for any queued events on this `Host` and dispatches one if available
-    pub fn check_events(&'_ mut self) -> Result<Option<Event<'_, T>>, Error> {
+    pub fn check_events(&mut self) -> Result<Option<Event<'_, T>>, Error> {
         // ENetEvent is Copy (aka has no Drop impl), so we don't have to make sure we `mem::forget` it later on
         let mut sys_event = MaybeUninit::uninit();
 
