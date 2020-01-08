@@ -6,15 +6,21 @@ use enet_sys::{
 
 use crate::{Packet, Peer};
 
+/// This struct represents an event that can occur when servicing an `EnetHost`.
 pub struct Event<'a, T> {
+    /// The peer that this event happened on.
     pub peer: &'a mut Peer<T>,
+    /// The type of this event.
     pub kind: EventKind,
 }
 
 #[derive(Debug)]
 pub enum EventKind {
+    /// Peer has connected.
     Connect,
+    /// Peer has disconnected.
     Disconnect { data: u32 },
+    /// Peer has received a packet.
     Receive { channel_id: u8, packet: Packet },
 }
 
