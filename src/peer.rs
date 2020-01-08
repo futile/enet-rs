@@ -152,6 +152,8 @@ where
     ///
     /// No `Disconnect` event will be created. No disconnect notification for the foreign peer is guaranteed, and this `Peer` is immediately reset on return from this method.
     pub fn disconnect_now(&mut self, user_data: u32) {
+        self.set_data(None);
+
         unsafe {
             enet_peer_disconnect_now(&mut self.inner as *mut _, user_data);
         }
