@@ -68,6 +68,12 @@ impl Address {
     }
 }
 
+impl From<SocketAddrV4> for Address {
+    fn from(addr: SocketAddrV4) -> Address {
+        Address { addr }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::Address;
