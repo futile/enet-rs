@@ -3,6 +3,7 @@ extern crate enet;
 use std::net::Ipv4Addr;
 
 use enet::*;
+use std::time::Duration;
 
 fn main() {
     let enet = Enet::new().expect("could not initialize ENet");
@@ -21,7 +22,9 @@ fn main() {
         .expect("connect failed");
 
     let peer = loop {
-        let e = host.service(1000).expect("service failed");
+        let e = host
+            .service(Duration::from_secs(1))
+            .expect("service failed");
 
         let e = match e {
             Some(ev) => ev,
@@ -56,7 +59,7 @@ fn main() {
     peer.disconnect_later(5);
 
     loop {
-        let e = host.service(1000).unwrap();
+        let e = host.service(Duration::from_secs(1)).unwrap();
         println!("received event: {:#?}", e);
     }
 }

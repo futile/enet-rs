@@ -1,8 +1,8 @@
 extern crate enet;
 
-use std::net::Ipv4Addr;
-
 use enet::*;
+use std::net::Ipv4Addr;
+use std::time::Duration;
 
 fn main() {
     let enet = Enet::new().expect("could not initialize ENet");
@@ -21,7 +21,7 @@ fn main() {
 
     loop {
         // Wait 500 ms for any events.
-        if let Some(Event { peer, kind }) = host
+        if let Some(Event { kind, .. }) = host
             .service(Duration::from_millis(500))
             .expect("service failed")
         {
