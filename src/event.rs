@@ -21,6 +21,8 @@ pub enum EventKind {
     /// Peer has connected.
     Connect,
     /// Peer has disconnected.
+    //
+    /// The data of the peer will be dropped on the next call to Host::service or when the structure is dropped.
     Disconnect {
         /// The data associated with this event. Usually a reason for disconnection.
         data: u32,
