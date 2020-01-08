@@ -20,7 +20,7 @@ fn main() {
     host.connect(&Address::new(Ipv4Addr::LOCALHOST, 9001), 10, 0)
         .expect("connect failed");
 
-    let mut peer = loop {
+    let peer = loop {
         let e = host.service(1000).expect("service failed");
 
         let e = match e {
@@ -30,15 +30,16 @@ fn main() {
 
         println!("[client] event: {:#?}", e);
 
-        match e {
-            Event::Connect(ref p) => {
-                break p.clone();
-            }
-            Event::Disconnect(ref p, r) => {
-                println!("connection NOT successful, peer: {:?}, reason: {}", p, r);
+        match e.kind {
+            EventKind::Connect => break e.peer,
+            EventKind::Disconnect { data } => {
+                println!(
+                    "connection NOT successful, peer: {:?}, reason: {}",
+                    e.peer, data
+                );
                 std::process::exit(0);
             }
-            Event::Receive { .. } => {
+            EventKind::Receive { .. } => {
                 panic!("unexpected Receive-event while waiting for connection")
             }
         };
@@ -48,7 +49,8 @@ fn main() {
     peer.send_packet(
         Packet::new(b"harro", PacketMode::ReliableSequenced).unwrap(),
         1,
-    ).unwrap();
+    )
+    .unwrap();
 
     // disconnect after all outgoing packets have been sent.
     peer.disconnect_later(5);
