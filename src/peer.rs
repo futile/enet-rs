@@ -2,9 +2,8 @@ use std::marker::PhantomData;
 use std::time::Duration;
 
 use enet_sys::{
-    enet_peer_disconnect, enet_peer_disconnect_later, enet_peer_disconnect_now, enet_peer_receive,
-    enet_peer_reset, enet_peer_send, ENetPeer, _ENetPeerState,
-    _ENetPeerState_ENET_PEER_STATE_ACKNOWLEDGING_CONNECT,
+    enet_peer_disconnect, enet_peer_disconnect_later, enet_peer_disconnect_now, enet_peer_reset,
+    enet_peer_send, ENetPeer, _ENetPeerState, _ENetPeerState_ENET_PEER_STATE_ACKNOWLEDGING_CONNECT,
     _ENetPeerState_ENET_PEER_STATE_ACKNOWLEDGING_DISCONNECT,
     _ENetPeerState_ENET_PEER_STATE_CONNECTED, _ENetPeerState_ENET_PEER_STATE_CONNECTING,
     _ENetPeerState_ENET_PEER_STATE_CONNECTION_PENDING,
@@ -121,7 +120,7 @@ where
 
     /// Returns the state this `Peer` is in.
     pub fn state(&self) -> PeerState {
-        PeerState::from_sys_state(unsafe { self.inner.state })
+        PeerState::from_sys_state(self.inner.state)
     }
 
     /// Queues a packet to be sent.
