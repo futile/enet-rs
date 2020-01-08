@@ -142,29 +142,29 @@ where
     /// Disconnects from this peer.
     ///
     /// A `Disconnect` event will be returned by `Host::service` once the disconnection is complete.
-    pub fn disconnect(&mut self, user_data: u32) {
+    pub fn disconnect(&mut self, data: u32) {
         unsafe {
-            enet_peer_disconnect(&mut self.inner as *mut _, user_data);
+            enet_peer_disconnect(&mut self.inner as *mut _, data);
         }
     }
 
     /// Disconnects from this peer immediately.
     ///
     /// No `Disconnect` event will be created. No disconnect notification for the foreign peer is guaranteed, and this `Peer` is immediately reset on return from this method.
-    pub fn disconnect_now(&mut self, user_data: u32) {
+    pub fn disconnect_now(&mut self, data: u32) {
         self.set_data(None);
 
         unsafe {
-            enet_peer_disconnect_now(&mut self.inner as *mut _, user_data);
+            enet_peer_disconnect_now(&mut self.inner as *mut _, data);
         }
     }
 
     /// Disconnects from this peer after all outgoing packets have been sent.
     ///
     /// A `Disconnect` event will be returned by `Host::service` once the disconnection is complete.
-    pub fn disconnect_later(&mut self, user_data: u32) {
+    pub fn disconnect_later(&mut self, data: u32) {
         unsafe {
-            enet_peer_disconnect_later(&mut self.inner as *mut _, user_data);
+            enet_peer_disconnect_later(&mut self.inner as *mut _, data);
         }
     }
 }
