@@ -106,7 +106,7 @@ impl Drop for Packet {
 }
 
 unsafe extern "C" fn packet_free_callback(packet: *mut ENetPacket) {
-    Vec::from_raw_parts(
+    Vec::<u8>::from_raw_parts(
         (*packet).data,
         (*packet).dataLength,
         (*packet).userData as usize,
