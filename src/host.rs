@@ -241,19 +241,19 @@ impl<T> Host<T> {
     /// The connection will not be done until a `Event::Connected` for this peer was received.
     ///
     /// `channel_count` specifies how many channels to allocate for this peer.
-    /// `user_data` is a user-specified value that can be chosen arbitrarily.
+    /// `data` is a user-specified value that can be chosen arbitrarily.
     pub fn connect(
         &mut self,
         address: &Address,
         channel_count: usize,
-        user_data: u32,
+        data: u32,
     ) -> Result<&mut Peer<T>, Error> {
         let res: *mut ENetPeer = unsafe {
             enet_host_connect(
                 self.inner,
                 &address.to_enet_address() as *const _,
                 channel_count,
-                user_data,
+                data,
             )
         };
 
