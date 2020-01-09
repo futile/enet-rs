@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use std::mem::MaybeUninit;
+use std::mem::{self, MaybeUninit};
 use std::ops::{Index, IndexMut};
 use std::sync::Arc;
 use std::time::Duration;
@@ -185,8 +185,10 @@ impl<T> Host<T> {
 
         let event = Event::from_sys_event(&sys_event);
         if let Some(EventKind::Disconnect { .. }) = event.as_ref().map(|event| &event.kind) {
-            self.disconnect_drop =
-                Some(unsafe { sys_event.peer as usize - (*self.inner).peers as usize });
+            self.disconnect_drop = Some(unsafe {
+                (sys_event.peer as usize - (*self.inner).peers as usize)
+                    / mem::size_of::<ENetPeer>()
+            });
         }
 
         event
