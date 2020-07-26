@@ -3,8 +3,9 @@ use std::marker::PhantomData;
 use std::time::Duration;
 
 use enet_sys::{
-    enet_peer_disconnect, enet_peer_disconnect_later, enet_peer_disconnect_now, enet_peer_reset,
-    enet_peer_send, ENetPeer, _ENetPeerState, _ENetPeerState_ENET_PEER_STATE_ACKNOWLEDGING_CONNECT,
+    enet_peer_disconnect, enet_peer_disconnect_later, enet_peer_disconnect_now, enet_peer_receive,
+    enet_peer_reset, enet_peer_send, ENetPeer, _ENetPeerState,
+    _ENetPeerState_ENET_PEER_STATE_ACKNOWLEDGING_CONNECT,
     _ENetPeerState_ENET_PEER_STATE_ACKNOWLEDGING_DISCONNECT,
     _ENetPeerState_ENET_PEER_STATE_CONNECTED, _ENetPeerState_ENET_PEER_STATE_CONNECTING,
     _ENetPeerState_ENET_PEER_STATE_CONNECTION_PENDING,
@@ -27,6 +28,17 @@ use crate::{Address, Error, Packet};
 pub struct Peer<T> {
     inner: ENetPeer,
     _data: PhantomData<T>,
+}
+
+/// A packet received directly from a `Peer`.
+///
+/// Contains the received packet as well as the channel on which it was received.
+#[derive(Debug)]
+pub struct PeerPacket {
+    /// The packet that was received.
+    pub packet: Packet,
+    /// The channel on which the packet was received.
+    pub channel_id: u8,
 }
 
 impl<'a, T> Peer<T>
@@ -166,6 +178,23 @@ where
     pub fn disconnect_later(&mut self, data: u32) {
         unsafe {
             enet_peer_disconnect_later(&mut self.inner as *mut _, data);
+        }
+    }
+
+    /// Attempts to dequeue an incoming packet from this `Peer`.
+    ///
+    /// On success, returns the packet and the channel id of the receiving channel.
+    pub fn receive<'b>(&mut self) -> Option<PeerPacket> {
+        let mut channel_id = 0u8;
+        let res =
+            unsafe { enet_peer_receive(&mut self.inner as *mut _, &mut channel_id as *mut _) };
+        if res.is_null() {
+            None
+        } else {
+            Some(PeerPacket {
+                packet: Packet::from_sys_packet(res),
+                channel_id,
+            })
         }
     }
 }
