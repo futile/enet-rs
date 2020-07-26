@@ -21,7 +21,7 @@ fn main() {
     host.connect(&Address::new(Ipv4Addr::LOCALHOST, 9001), 10, 0)
         .expect("connect failed");
 
-    let peer = loop {
+    let peer_id = loop {
         let e = host
             .service(Duration::from_secs(1))
             .expect("service failed");
@@ -34,11 +34,11 @@ fn main() {
         println!("[client] event: {:#?}", e);
 
         match e.kind {
-            EventKind::Connect => break e.peer,
+            EventKind::Connect => break e.peer_id,
             EventKind::Disconnect { data } => {
                 println!(
                     "connection NOT successful, peer: {:?}, reason: {}",
-                    e.peer, data
+                    e.peer_id, data
                 );
                 std::process::exit(0);
             }
@@ -49,14 +49,15 @@ fn main() {
     };
 
     // send a "hello"-like packet
-    peer.send_packet(
-        Packet::from_vec(b"harro".to_vec(), PacketMode::ReliableSequenced).unwrap(),
-        1,
-    )
-    .unwrap();
+    host[peer_id]
+        .send_packet(
+            Packet::from_vec(b"harro".to_vec(), PacketMode::ReliableSequenced).unwrap(),
+            1,
+        )
+        .unwrap();
 
     // disconnect after all outgoing packets have been sent.
-    peer.disconnect_later(5);
+    host[peer_id].disconnect_later(5);
 
     loop {
         let e = host.service(Duration::from_secs(1)).unwrap();

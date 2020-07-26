@@ -4,13 +4,13 @@ use enet_sys::{
     _ENetEventType_ENET_EVENT_TYPE_NONE, _ENetEventType_ENET_EVENT_TYPE_RECEIVE,
 };
 
-use crate::{Packet, Peer};
+use crate::{Host, Packet, PeerID};
 
 /// This struct represents an event that can occur when servicing an `Host`.
 #[derive(Debug)]
-pub struct Event<'a, T> {
+pub struct Event {
     /// The peer that this event happened on.
-    pub peer: &'a mut Peer<T>,
+    pub peer_id: PeerID,
     /// The type of this event.
     pub kind: EventKind,
 }
@@ -36,13 +36,13 @@ pub enum EventKind {
     },
 }
 
-impl<'a, T> Event<'a, T> {
-    pub(crate) fn from_sys_event(event_sys: &ENetEvent) -> Option<Event<'a, T>> {
+impl Event {
+    pub(crate) fn from_sys_event<T>(event_sys: &ENetEvent, host: &Host<T>) -> Option<Event> {
         if event_sys.type_ == _ENetEventType_ENET_EVENT_TYPE_NONE {
             return None;
         }
 
-        let peer = Peer::new_mut(unsafe { &mut *event_sys.peer });
+        let peer_id = unsafe { host.peer_id(event_sys.peer) };
         let kind = match event_sys.type_ {
             _ENetEventType_ENET_EVENT_TYPE_CONNECT => EventKind::Connect,
             _ENetEventType_ENET_EVENT_TYPE_DISCONNECT => EventKind::Disconnect {
@@ -55,6 +55,6 @@ impl<'a, T> Event<'a, T> {
             _ => panic!("unexpected event type: {}", event_sys.type_),
         };
 
-        Some(Event { peer, kind })
+        Some(Event { peer_id, kind })
     }
 }

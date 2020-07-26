@@ -157,7 +157,7 @@ impl<T> Host<T> {
         }))
     }
 
-    unsafe fn peer_id(&self, peer: *mut ENetPeer) -> PeerID {
+    pub(crate) unsafe fn peer_id(&self, peer: *mut ENetPeer) -> PeerID {
         PeerID((peer as usize - (*self.inner).peers as usize) / std::mem::size_of::<ENetPeer>())
     }
 
@@ -184,10 +184,10 @@ impl<T> Host<T> {
         }
     }
 
-    fn process_event(&mut self, sys_event: ENetEvent) -> Option<Event<'_, T>> {
+    fn process_event(&mut self, sys_event: ENetEvent) -> Option<Event> {
         self.drop_disconnected();
 
-        let event = Event::from_sys_event(&sys_event);
+        let event = Event::from_sys_event(&sys_event, self);
         if let Some(EventKind::Disconnect { .. }) = event.as_ref().map(|event| &event.kind) {
             self.disconnect_drop = Some(unsafe {
                 (sys_event.peer as usize - (*self.inner).peers as usize)
@@ -203,7 +203,7 @@ impl<T> Host<T> {
     /// This should be called regularly for ENet to work properly with good performance.
     ///
     /// The function won't block for less than 1ms.
-    pub fn service(&mut self, timeout: Duration) -> Result<Option<Event<'_, T>>, Error> {
+    pub fn service(&mut self, timeout: Duration) -> Result<Option<Event>, Error> {
         // ENetEvent is Copy (aka has no Drop impl), so we don't have to make sure we `mem::forget` it later on
         let mut sys_event = MaybeUninit::uninit();
 
@@ -226,7 +226,7 @@ impl<T> Host<T> {
     }
 
     /// Checks for any queued events on this `Host` and dispatches one if available
-    pub fn check_events(&mut self) -> Result<Option<Event<'_, T>>, Error> {
+    pub fn check_events(&mut self) -> Result<Option<Event>, Error> {
         // ENetEvent is Copy (aka has no Drop impl), so we don't have to make sure we `mem::forget` it later on
         let mut sys_event = MaybeUninit::uninit();
 
