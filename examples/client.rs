@@ -50,7 +50,7 @@ fn main() {
 
     // send a "hello"-like packet
     peer.send_packet(
-        Packet::new(b"harro".to_vec(), PacketMode::ReliableSequenced).unwrap(),
+        Packet::from_vec(b"harro".to_vec(), PacketMode::ReliableSequenced).unwrap(),
         1,
     )
     .unwrap();
