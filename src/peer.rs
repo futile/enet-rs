@@ -19,6 +19,7 @@ use crate::{Address, Error, Packet};
 ///
 /// The lifetime of these instances is not really clear from the ENet documentation.
 /// Therefore, `Peer`s are always borrowed, and can not really be stored anywhere.
+/// For this purpose, use [PeerID](struct.PeerID.html) instead.
 ///
 /// ENet allows the association of arbitrary data with each peer.
 /// The type of this associated data is chosen through `T`.
@@ -177,6 +178,16 @@ where
         f.debug_struct("Peer").field("data", &self.data()).finish()
     }
 }
+
+/// The ID of a [Peer](struct.Peer.html).
+///
+/// Can be used with the [peer](struct.Host.html#method.peer)/[peer_mut](struct.Host.html#method.peer_mut)-methods of Host, to retrieve references to a Peer.
+/// As the lifetime semantics of Peers aren't clear in Enet and they cannot be owned, PeerID's are the
+/// primary way of storing owned references to Peers.
+///
+/// When connecting to a host, both a reference to the host, and it's ID are returned.
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
+pub struct PeerID(pub(crate) usize);
 
 /// Describes the state a `Peer` is in.
 ///

@@ -4,7 +4,7 @@ use std::ops::{Index, IndexMut};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::{Address, EnetKeepAlive, Error, Event, EventKind, Peer};
+use crate::{Address, EnetKeepAlive, Error, Event, EventKind, Peer, PeerID};
 
 use enet_sys::{
     enet_host_bandwidth_limit, enet_host_channel_limit, enet_host_check_events, enet_host_connect,
@@ -136,25 +136,29 @@ impl<T> Host<T> {
     }
 
     /// Returns a mutable reference to a peer at the index, None if the index is invalid.
-    pub fn peer_mut(&mut self, idx: usize) -> Option<&mut Peer<T>> {
-        if idx >= self.peer_count() {
+    pub fn peer_mut(&mut self, idx: PeerID) -> Option<&mut Peer<T>> {
+        if idx.0 >= self.peer_count() {
             return None;
         }
 
         Some(Peer::new_mut(unsafe {
-            &mut *((*self.inner).peers.offset(idx as isize))
+            &mut *((*self.inner).peers.offset(idx.0 as isize))
         }))
     }
 
     /// Returns a reference to a peer at the index, None if the index is invalid.
-    pub fn peer(&self, idx: usize) -> Option<&Peer<T>> {
-        if idx >= self.peer_count() {
+    pub fn peer(&self, idx: PeerID) -> Option<&Peer<T>> {
+        if idx.0 >= self.peer_count() {
             return None;
         }
 
         Some(Peer::new(unsafe {
-            &*((*self.inner).peers.offset(idx as isize))
+            &*((*self.inner).peers.offset(idx.0 as isize))
         }))
+    }
+
+    unsafe fn peer_id(&self, peer: *mut ENetPeer) -> PeerID {
+        PeerID((peer as usize - (*self.inner).peers as usize) / std::mem::size_of::<ENetPeer>())
     }
 
     /// Returns an iterator over all peers connected to this `Host`.
@@ -247,7 +251,7 @@ impl<T> Host<T> {
         address: &Address,
         channel_count: usize,
         data: u32,
-    ) -> Result<&mut Peer<T>, Error> {
+    ) -> Result<(&mut Peer<T>, PeerID), Error> {
         let res: *mut ENetPeer = unsafe {
             enet_host_connect(
                 self.inner,
@@ -261,20 +265,25 @@ impl<T> Host<T> {
             return Err(Error(0));
         }
 
-        Ok(Peer::new_mut(unsafe { &mut *res }))
+        Ok((
+            Peer::new_mut(unsafe { &mut *res }),
+            // We can do pointer arithmetic here to determine the offset of our new Peer in the
+            // list of peers, which is it's PeerID.
+            unsafe { self.peer_id(res) },
+        ))
     }
 }
 
-impl<T> Index<usize> for Host<T> {
+impl<T> Index<PeerID> for Host<T> {
     type Output = Peer<T>;
 
-    fn index(&self, idx: usize) -> &Peer<T> {
+    fn index(&self, idx: PeerID) -> &Peer<T> {
         self.peer(idx).expect("invalid peer index")
     }
 }
 
-impl<T> IndexMut<usize> for Host<T> {
-    fn index_mut(&mut self, idx: usize) -> &mut Peer<T> {
+impl<T> IndexMut<PeerID> for Host<T> {
+    fn index_mut(&mut self, idx: PeerID) -> &mut Peer<T> {
         self.peer_mut(idx).expect("invalid peer index")
     }
 }
