@@ -37,7 +37,7 @@ pub enum EventKind {
 }
 
 impl Event {
-    pub(crate) fn from_sys_event<T>(event_sys: &ENetEvent, host: &Host<T>) -> Option<Event> {
+    pub(crate) fn from_sys_event<T>(event_sys: ENetEvent, host: &Host<T>) -> Option<Event> {
         if event_sys.type_ == _ENetEventType_ENET_EVENT_TYPE_NONE {
             return None;
         }

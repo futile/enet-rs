@@ -62,7 +62,7 @@ impl BandwidthLimit {
 /// This type provides functionality such as connection establishment and packet transmission.
 pub struct Host<T> {
     inner: *mut ENetHost,
-    disconnect_drop: Option<usize>,
+    disconnect_drop: Option<PeerID>,
     _keep_alive: Arc<EnetKeepAlive>,
     _peer_data: PhantomData<*const T>,
 }
@@ -179,7 +179,7 @@ impl<T> Host<T> {
 
     fn drop_disconnected(&mut self) {
         if let Some(idx) = self.disconnect_drop.take() {
-            Peer::<T>::new_mut(unsafe { &mut *((*self.inner).peers.offset(idx as isize)) })
+            Peer::<T>::new_mut(unsafe { &mut *((*self.inner).peers.offset(idx.0 as isize)) })
                 .set_data(None);
         }
     }
@@ -187,12 +187,13 @@ impl<T> Host<T> {
     fn process_event(&mut self, sys_event: ENetEvent) -> Option<Event> {
         self.drop_disconnected();
 
-        let event = Event::from_sys_event(&sys_event, self);
-        if let Some(EventKind::Disconnect { .. }) = event.as_ref().map(|event| &event.kind) {
-            self.disconnect_drop = Some(unsafe {
-                (sys_event.peer as usize - (*self.inner).peers as usize)
-                    / mem::size_of::<ENetPeer>()
-            });
+        let event = Event::from_sys_event(sys_event, self);
+        if let Some(Event {
+            peer_id,
+            kind: EventKind::Disconnect { .. },
+        }) = event
+        {
+            self.disconnect_drop = Some(peer_id);
         }
 
         event
