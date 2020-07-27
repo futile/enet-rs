@@ -179,7 +179,8 @@ impl<T> Host<T> {
 
     fn drop_disconnected(&mut self) {
         if let Some(idx) = self.disconnect_drop.take() {
-            Peer::<T>::new_mut(unsafe { &mut *((*self.inner).peers.offset(idx.0 as isize)) })
+            self.peer_mut(idx)
+                .expect("Invalid PeerID in disconnect_drop in enet::Host")
                 .set_data(None);
         }
     }
