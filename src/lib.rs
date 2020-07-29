@@ -56,10 +56,10 @@ mod packet;
 mod peer;
 
 pub use crate::address::Address;
-pub use crate::event::Event;
+pub use crate::event::{Event, EventKind};
 pub use crate::host::{BandwidthLimit, ChannelLimit, Host};
 pub use crate::packet::{Packet, PacketMode};
-pub use crate::peer::{Peer, PeerPacket, PeerState};
+pub use crate::peer::{Peer, PeerID, PeerState};
 
 pub use enet_sys::ENetVersion as EnetVersion;
 

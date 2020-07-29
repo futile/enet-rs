@@ -3,6 +3,7 @@ extern crate enet;
 use std::net::Ipv4Addr;
 
 use enet::*;
+use std::time::Duration;
 
 fn main() {
     let enet = Enet::new().expect("could not initialize ENet");
@@ -20,8 +21,10 @@ fn main() {
     host.connect(&Address::new(Ipv4Addr::LOCALHOST, 9001), 10, 0)
         .expect("connect failed");
 
-    let mut peer = loop {
-        let e = host.service(1000).expect("service failed");
+    let peer_id = loop {
+        let e = host
+            .service(Duration::from_secs(1))
+            .expect("service failed");
 
         let e = match e {
             Some(ev) => ev,
@@ -30,31 +33,34 @@ fn main() {
 
         println!("[client] event: {:#?}", e);
 
-        match e {
-            Event::Connect(ref p) => {
-                break p.clone();
-            }
-            Event::Disconnect(ref p, r) => {
-                println!("connection NOT successful, peer: {:?}, reason: {}", p, r);
+        match e.kind {
+            EventKind::Connect => break e.peer_id,
+            EventKind::Disconnect { data } => {
+                println!(
+                    "connection NOT successful, peer: {:?}, reason: {}",
+                    e.peer_id, data
+                );
                 std::process::exit(0);
             }
-            Event::Receive { .. } => {
+            EventKind::Receive { .. } => {
                 panic!("unexpected Receive-event while waiting for connection")
             }
         };
     };
 
     // send a "hello"-like packet
-    peer.send_packet(
-        Packet::new(b"harro", PacketMode::ReliableSequenced).unwrap(),
-        1,
-    ).unwrap();
+    host[peer_id]
+        .send_packet(
+            Packet::new(b"harro".to_vec(), PacketMode::ReliableSequenced).unwrap(),
+            1,
+        )
+        .unwrap();
 
     // disconnect after all outgoing packets have been sent.
-    peer.disconnect_later(5);
+    host[peer_id].disconnect_later(5);
 
     loop {
-        let e = host.service(1000).unwrap();
+        let e = host.service(Duration::from_secs(1)).unwrap();
         println!("received event: {:#?}", e);
     }
 }
