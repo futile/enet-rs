@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use std::mem::{self, MaybeUninit};
+use std::mem::MaybeUninit;
 use std::ops::{Index, IndexMut};
 use std::sync::Arc;
 use std::time::Duration;

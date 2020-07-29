@@ -56,16 +56,10 @@ impl PacketMode {
 }
 
 impl Packet {
-    /// Creates a new Packet with optional reliablitly settings
-    ///
-    /// This is provided as a convenience function, as Vec<u8> is
-    /// a lot more common then Box<[u8]>.
-    pub fn from_vec(vec: Vec<u8>, mode: PacketMode) -> Result<Packet, Error> {
-        Self::new(vec.into_boxed_slice(), mode)
-    }
-
     /// Creates a new Packet with optional reliability settings.
-    pub fn new(data: Box<[u8]>, mode: PacketMode) -> Result<Packet, Error> {
+    ///
+    /// The data is consumed and moved into the enet package without copy.
+    pub fn new(data: Vec<u8>, mode: PacketMode) -> Result<Packet, Error> {
         let res = unsafe {
             enet_packet_create(
                 data.as_ptr() as *const _,
@@ -73,15 +67,19 @@ impl Packet {
                 mode.to_sys_flags() | _ENetPacketFlag_ENET_PACKET_FLAG_NO_ALLOCATE,
             )
         };
-        Box::leak(data);
 
         if res.is_null() {
             return Err(Error(0));
         }
 
         unsafe {
+            (*res).userData = data.capacity() as *mut _;
             (*res).freeCallback = Some(packet_free_callback);
         }
+
+        // we leak the data here, as the enet package has taken ownership of it.
+        // The data will be deallocated by packet_free_callback
+        std::mem::forget(data);
 
         Ok(Packet::from_sys_packet(res))
     }
@@ -112,8 +110,9 @@ impl Drop for Packet {
 }
 
 unsafe extern "C" fn packet_free_callback(packet: *mut ENetPacket) {
-    drop(Box::from_raw(std::slice::from_raw_parts_mut(
+    drop(Vec::<u8>::from_raw_parts(
         (*packet).data,
         (*packet).dataLength,
-    )));
+        (*packet).userData as usize,
+    ));
 }
