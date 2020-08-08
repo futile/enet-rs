@@ -1,6 +1,6 @@
 [package]
 name = "enet"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["Felix Rath <felixm.rath@gmail.com>"]
 edition = "2018"
 description = "High-level, rust-y bindings to the ENet library"
