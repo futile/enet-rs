@@ -108,11 +108,11 @@ pub enum InitializationError {
 impl Enet {
     /// Initializes ENet and returns a handle to the top-level functionality, in the form of an `Enet`-instance.
     pub fn new() -> Result<Enet, InitializationError> {
-        match ENET_STATUS.compare_and_swap(ENET_UNINITIALIZED, ENET_INITIALIZED, Ordering::SeqCst) {
-            ENET_UNINITIALIZED => (),
-            ENET_INITIALIZED => return Err(InitializationError::AlreadyInitialized),
-            ENET_DEINITIALIZED => return Err(InitializationError::AlreadyDeinitialized),
-            u => panic!(
+        match ENET_STATUS.compare_exchange(ENET_UNINITIALIZED, ENET_INITIALIZED, Ordering::SeqCst, Ordering::SeqCst) {
+            Ok(_) => (),
+            Err(ENET_INITIALIZED) => return Err(InitializationError::AlreadyInitialized),
+            Err(ENET_DEINITIALIZED) => return Err(InitializationError::AlreadyDeinitialized),
+            Err(u) => panic!(
                 "enet-rs internal error; unexpected value in ENET_STATUS (new): {}",
                 u
             ),
@@ -172,9 +172,9 @@ pub fn linked_version() -> EnetVersion {
 
 impl Drop for EnetKeepAlive {
     fn drop(&mut self) {
-        match ENET_STATUS.compare_and_swap(ENET_INITIALIZED, ENET_DEINITIALIZED, Ordering::SeqCst) {
-            ENET_INITIALIZED => (),
-            other => panic!(
+        match ENET_STATUS.compare_exchange(ENET_INITIALIZED, ENET_DEINITIALIZED, Ordering::SeqCst, Ordering::SeqCst) {
+            Ok(_) => (),
+            Err(other) => panic!(
                 "enet-rs internal error; unexpected value in ENET_STATUS (drop): {}",
                 other
             ),
