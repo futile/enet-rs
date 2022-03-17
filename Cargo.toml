@@ -13,7 +13,7 @@ categories = ["game-engines", "network-programming"]
 license = "Apache-2.0 OR MIT"
 
 [badges]
-maintenance = { status = "actively-developed" }
+maintenance = { status = "passively-maintained" }
 
 [dependencies]
 enet-sys = "0.2.3"
