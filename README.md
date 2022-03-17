@@ -35,8 +35,8 @@ enet = "0.2.3"
 
 ## Documentation & Examples
 
-Documentation is available by running `cargo doc`. An example server and client
-can be found in the `examples` directory.
+Documentation is available on https://docs.rs/enet or by running `cargo doc`.
+An example server and client can be found in the `examples` directory.
 
 ## License
 
