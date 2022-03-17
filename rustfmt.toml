@@ -1,0 +1,20 @@
+# See https://rust-lang.github.io/rustfmt/ for all possible settings &
+# documentation.
+
+# When running `cargo fmt`, we don't need to set this option because it will be
+# picked up from cargo. However, this explicit setting is useful for (IDE)
+# tools that run `rustfmt` directly, which otherwise go with the default of
+# "2015".
+edition = "2021"
+
+# Group (all) imports from the same crate.
+imports_granularity = "Crate"
+
+# Prevent accidental windows/mac newlines from slipping in.
+newline_style = "Unix"
+
+# Group imports with a sensible "std-external-crate" structure.
+group_imports = "StdExternalCrate"
+
+# Also apply max line width formatting to comments.
+wrap_comments = true
