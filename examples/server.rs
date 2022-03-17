@@ -27,8 +27,11 @@ fn main() {
                 channel_id,
                 ref packet,
                 ..
-            }) => println!("got packet on channel {}, content: '{}'", channel_id,
-                         std::str::from_utf8(packet.data()).unwrap()),
+            }) => println!(
+                "got packet on channel {}, content: '{}'",
+                channel_id,
+                std::str::from_utf8(packet.data()).unwrap()
+            ),
             _ => (),
         }
     }

@@ -48,7 +48,8 @@ fn main() {
     peer.send_packet(
         Packet::new(b"harro", PacketMode::ReliableSequenced).unwrap(),
         1,
-    ).unwrap();
+    )
+    .unwrap();
 
     // disconnect after all outgoing packets have been sent.
     peer.disconnect_later(5);

@@ -20,7 +20,8 @@ pub enum PacketMode {
     UnreliableSequenced,
     /// The packet will be sent unreliably and unsequenced.
     UnreliableUnsequenced,
-    /// The packet will be sent reliably and sequenced with other reliable packets.
+    /// The packet will be sent reliably and sequenced with other reliable
+    /// packets.
     ReliableSequenced,
 }
 
@@ -46,7 +47,9 @@ impl PacketMode {
     fn to_sys_flags(&self) -> u32 {
         match self {
             PacketMode::UnreliableSequenced => 0,
-            PacketMode::UnreliableUnsequenced => _ENetPacketFlag_ENET_PACKET_FLAG_UNSEQUENCED as u32,
+            PacketMode::UnreliableUnsequenced => {
+                _ENetPacketFlag_ENET_PACKET_FLAG_UNSEQUENCED as u32
+            }
             PacketMode::ReliableSequenced => _ENetPacketFlag_ENET_PACKET_FLAG_RELIABLE as u32,
         }
     }

@@ -1,14 +1,12 @@
-use std::marker::PhantomData;
-use std::mem::MaybeUninit;
-use std::sync::Arc;
-
-use crate::{Address, EnetKeepAlive, Error, Event, Peer};
+use std::{marker::PhantomData, mem::MaybeUninit, sync::Arc};
 
 use enet_sys::{
     enet_host_bandwidth_limit, enet_host_channel_limit, enet_host_check_events, enet_host_connect,
     enet_host_destroy, enet_host_flush, enet_host_service, ENetHost, ENetPeer,
     ENET_PROTOCOL_MAXIMUM_CHANNEL_COUNT,
 };
+
+use crate::{Address, EnetKeepAlive, Error, Event, Peer};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 /// Represents a bandwidth limit or unlimited.
@@ -55,9 +53,11 @@ impl BandwidthLimit {
     }
 }
 
-/// A `Host` represents one endpoint of an ENet connection. Created through `Enet`.
+/// A `Host` represents one endpoint of an ENet connection. Created through
+/// `Enet`.
 ///
-/// This type provides functionality such as connection establishment and packet transmission.
+/// This type provides functionality such as connection establishment and packet
+/// transmission.
 pub struct Host<T> {
     inner: *mut ENetHost,
 
@@ -78,7 +78,8 @@ impl<T> Host<T> {
 
     /// Sends any queued packets on the host specified to its designated peers.
     ///
-    /// This function need only be used in circumstances where one wishes to send queued packets earlier than in a call to `Host::service()`.
+    /// This function need only be used in circumstances where one wishes to
+    /// send queued packets earlier than in a call to `Host::service()`.
     pub fn flush(&mut self) {
         unsafe {
             enet_host_flush(self.inner);
@@ -142,9 +143,11 @@ impl<T> Host<T> {
 
     /// Maintains this host and delivers an event if available.
     ///
-    /// This should be called regularly for ENet to work properly with good performance.
+    /// This should be called regularly for ENet to work properly with good
+    /// performance.
     pub fn service(&'_ mut self, timeout_ms: u32) -> Result<Option<Event<'_, T>>, Error> {
-        // ENetEvent is Copy (aka has no Drop impl), so we don't have to make sure we `mem::forget` it later on
+        // ENetEvent is Copy (aka has no Drop impl), so we don't have to make sure we
+        // `mem::forget` it later on
         let mut sys_event = MaybeUninit::uninit();
 
         let res = unsafe { enet_host_service(self.inner, sys_event.as_mut_ptr(), timeout_ms) };
@@ -156,12 +159,15 @@ impl<T> Host<T> {
             _ => panic!("unreachable"),
         }
 
-        // TODO: check `total*` fields on `inner`, these need to be reset from time to time.
+        // TODO: check `total*` fields on `inner`, these need to be reset from
+        // time to time.
     }
 
-    /// Checks for any queued events on this `Host` and dispatches one if available
+    /// Checks for any queued events on this `Host` and dispatches one if
+    /// available
     pub fn check_events(&'_ mut self) -> Result<Option<Event<'_, T>>, Error> {
-        // ENetEvent is Copy (aka has no Drop impl), so we don't have to make sure we `mem::forget` it later on
+        // ENetEvent is Copy (aka has no Drop impl), so we don't have to make sure we
+        // `mem::forget` it later on
         let mut sys_event = MaybeUninit::uninit();
 
         let res = unsafe { enet_host_check_events(self.inner, sys_event.as_mut_ptr()) };
@@ -176,7 +182,8 @@ impl<T> Host<T> {
 
     /// Initiates a connection to a foreign host.
     ///
-    /// The connection will not be done until a `Event::Connected` for this peer was received.
+    /// The connection will not be done until a `Event::Connected` for this peer
+    /// was received.
     ///
     /// `channel_count` specifies how many channels to allocate for this peer.
     /// `user_data` is a user-specified value that can be chosen arbitrarily.

@@ -1,9 +1,11 @@
-use std::ffi::CString;
-use std::net::{Ipv4Addr, SocketAddrV4};
-
-use crate::Error;
+use std::{
+    ffi::CString,
+    net::{Ipv4Addr, SocketAddrV4},
+};
 
 use enet_sys::ENetAddress;
+
+use crate::Error;
 
 /// An IPv4 address that can be used with the ENet API.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -76,10 +78,9 @@ impl From<SocketAddrV4> for Address {
 
 #[cfg(test)]
 mod tests {
-    use super::Address;
+    use std::{ffi::CString, net::Ipv4Addr};
 
-    use std::ffi::CString;
-    use std::net::Ipv4Addr;
+    use super::Address;
 
     #[test]
     fn test_from_valid_hostname() {

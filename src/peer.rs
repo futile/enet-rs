@@ -1,28 +1,24 @@
-use std::marker::PhantomData;
-use std::time::Duration;
+use std::{marker::PhantomData, time::Duration};
 
 use enet_sys::{
     enet_peer_disconnect, enet_peer_disconnect_later, enet_peer_disconnect_now, enet_peer_receive,
-    enet_peer_reset, enet_peer_send, ENetPeer,
-    _ENetPeerState,
-    _ENetPeerState_ENET_PEER_STATE_DISCONNECTED,
-    _ENetPeerState_ENET_PEER_STATE_CONNECTING,
+    enet_peer_reset, enet_peer_send, ENetPeer, _ENetPeerState,
     _ENetPeerState_ENET_PEER_STATE_ACKNOWLEDGING_CONNECT,
+    _ENetPeerState_ENET_PEER_STATE_ACKNOWLEDGING_DISCONNECT,
+    _ENetPeerState_ENET_PEER_STATE_CONNECTED, _ENetPeerState_ENET_PEER_STATE_CONNECTING,
     _ENetPeerState_ENET_PEER_STATE_CONNECTION_PENDING,
     _ENetPeerState_ENET_PEER_STATE_CONNECTION_SUCCEEDED,
-    _ENetPeerState_ENET_PEER_STATE_CONNECTED,
-    _ENetPeerState_ENET_PEER_STATE_DISCONNECT_LATER,
-    _ENetPeerState_ENET_PEER_STATE_DISCONNECTING,
-    _ENetPeerState_ENET_PEER_STATE_ACKNOWLEDGING_DISCONNECT,
-    _ENetPeerState_ENET_PEER_STATE_ZOMBIE,
+    _ENetPeerState_ENET_PEER_STATE_DISCONNECTED, _ENetPeerState_ENET_PEER_STATE_DISCONNECTING,
+    _ENetPeerState_ENET_PEER_STATE_DISCONNECT_LATER, _ENetPeerState_ENET_PEER_STATE_ZOMBIE,
 };
 
 use crate::{Address, Error, Packet};
 
 /// This struct represents an endpoint in an ENet-connection.
 ///
-/// The lifetime of these instances is not really clear from the ENet documentation.
-/// Therefore, `Peer`s are always borrowed, and can not really be stored anywhere.
+/// The lifetime of these instances is not really clear from the ENet
+/// documentation. Therefore, `Peer`s are always borrowed, and can not really be
+/// stored anywhere.
 ///
 /// ENet allows the association of arbitrary data with each peer.
 /// The type of this associated data is chosen through `T`.
@@ -35,7 +31,8 @@ pub struct Peer<'a, T: 'a> {
 
 /// A packet received directly from a `Peer`.
 ///
-/// Contains the received packet as well as the channel on which it was received.
+/// Contains the received packet as well as the channel on which it was
+/// received.
 #[derive(Debug)]
 pub struct PeerPacket<'b, 'a, T: 'a> {
     /// The packet that was received.
@@ -48,7 +45,8 @@ pub struct PeerPacket<'b, 'a, T: 'a> {
 
 /// Describes the state a `Peer` is in.
 ///
-/// The states should be self-explanatory, ENet doesn't explain them more either.
+/// The states should be self-explanatory, ENet doesn't explain them more
+/// either.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 #[allow(missing_docs)]
 pub enum PeerState {
@@ -76,7 +74,9 @@ impl PeerState {
             _ENetPeerState_ENET_PEER_STATE_CONNECTED => PeerState::Connected,
             _ENetPeerState_ENET_PEER_STATE_DISCONNECT_LATER => PeerState::DisconnectLater,
             _ENetPeerState_ENET_PEER_STATE_DISCONNECTING => PeerState::Disconnecting,
-            _ENetPeerState_ENET_PEER_STATE_ACKNOWLEDGING_DISCONNECT => PeerState::AcknowledgingDisconnect,
+            _ENetPeerState_ENET_PEER_STATE_ACKNOWLEDGING_DISCONNECT => {
+                PeerState::AcknowledgingDisconnect
+            }
             _ENetPeerState_ENET_PEER_STATE_ZOMBIE => PeerState::Zombie,
             val => panic!("unexpected peer state: {}", val),
         }
@@ -114,7 +114,8 @@ impl<'a, T> Peer<'a, T> {
         }
     }
 
-    /// Returns a mutable reference to the data associated with this `Peer`, if set.
+    /// Returns a mutable reference to the data associated with this `Peer`, if
+    /// set.
     pub fn data_mut(&mut self) -> Option<&mut T> {
         unsafe {
             let raw_data = (*self.inner).data as *mut T;
@@ -127,7 +128,8 @@ impl<'a, T> Peer<'a, T> {
         }
     }
 
-    /// Sets or clears the data associated with this `Peer`, replacing existing data.
+    /// Sets or clears the data associated with this `Peer`, replacing existing
+    /// data.
     pub fn set_data(&mut self, data: Option<T>) {
         unsafe {
             let raw_data = (*self.inner).data as *mut T;
@@ -156,14 +158,16 @@ impl<'a, T> Peer<'a, T> {
         unsafe { (*self.inner).outgoingBandwidth }
     }
 
-    /// Returns the mean round trip time between sending a reliable packet and receiving its acknowledgement.
+    /// Returns the mean round trip time between sending a reliable packet and
+    /// receiving its acknowledgement.
     pub fn mean_rtt(&self) -> Duration {
         Duration::from_millis(unsafe { (*self.inner).roundTripTime } as u64)
     }
 
     /// Forcefully disconnects this `Peer`.
     ///
-    /// The foreign host represented by the peer is not notified of the disconnection and will timeout on its connection to the local host.
+    /// The foreign host represented by the peer is not notified of the
+    /// disconnection and will timeout on its connection to the local host.
     pub fn reset(self) {
         unsafe {
             enet_peer_reset(self.inner);
@@ -172,7 +176,7 @@ impl<'a, T> Peer<'a, T> {
 
     /// Returns the state this `Peer` is in.
     pub fn state(&self) -> PeerState {
-        PeerState::from_sys_state(unsafe {(*self.inner).state})
+        PeerState::from_sys_state(unsafe { (*self.inner).state })
     }
 
     /// Queues a packet to be sent.
@@ -191,7 +195,8 @@ impl<'a, T> Peer<'a, T> {
 
     /// Disconnects from this peer.
     ///
-    /// A `Disconnect` event will be returned by `Host::service` once the disconnection is complete.
+    /// A `Disconnect` event will be returned by `Host::service` once the
+    /// disconnection is complete.
     pub fn disconnect(&mut self, user_data: u32) {
         unsafe {
             enet_peer_disconnect(self.inner, user_data);
@@ -200,7 +205,9 @@ impl<'a, T> Peer<'a, T> {
 
     /// Disconnects from this peer immediately.
     ///
-    /// No `Disconnect` event will be created. No disconnect notification for the foreign peer is guaranteed, and this `Peer` is immediately reset on return from this method.
+    /// No `Disconnect` event will be created. No disconnect notification for
+    /// the foreign peer is guaranteed, and this `Peer` is immediately reset on
+    /// return from this method.
     pub fn disconnect_now(self, user_data: u32) {
         unsafe {
             enet_peer_disconnect_now(self.inner, user_data);
@@ -209,7 +216,8 @@ impl<'a, T> Peer<'a, T> {
 
     /// Disconnects from this peer after all outgoing packets have been sent.
     ///
-    /// A `Disconnect` event will be returned by `Host::service` once the disconnection is complete.
+    /// A `Disconnect` event will be returned by `Host::service` once the
+    /// disconnection is complete.
     pub fn disconnect_later(&mut self, user_data: u32) {
         unsafe {
             enet_peer_disconnect_later(self.inner, user_data);
@@ -218,7 +226,8 @@ impl<'a, T> Peer<'a, T> {
 
     /// Attempts to dequeue an incoming packet from this `Peer`.
     ///
-    /// On success, returns the packet and the channel id of the receiving channel.
+    /// On success, returns the packet and the channel id of the receiving
+    /// channel.
     pub fn receive<'b>(&'b mut self) -> Option<PeerPacket<'b, 'a, T>> {
         let mut channel_id = 0u8;
 

@@ -10,12 +10,14 @@ use crate::{Packet, Peer};
 /// Also see the official ENet documentation for more information.
 #[derive(Debug)]
 pub enum Event<'a, T> {
-    /// This variant represents the connection of a peer, contained in the only field.
+    /// This variant represents the connection of a peer, contained in the only
+    /// field.
     Connect(Peer<'a, T>),
-    /// This variant represents the disconnection of a peer, either because it was requested or due to a timeout.
+    /// This variant represents the disconnection of a peer, either because it
+    /// was requested or due to a timeout.
     ///
-    /// The disconnected peer is contained in the first field, while the second field contains the user-specified
-    /// data for this disconnection.
+    /// The disconnected peer is contained in the first field, while the second
+    /// field contains the user-specified data for this disconnection.
     Disconnect(Peer<'a, T>, u32),
     /// This variants repersents a packet that was received.
     Receive {
@@ -36,10 +38,9 @@ impl<'a, T> Event<'a, T> {
             _ENetEventType_ENET_EVENT_TYPE_CONNECT => {
                 Some(Event::Connect(Peer::new(event_sys.peer)))
             }
-            _ENetEventType_ENET_EVENT_TYPE_DISCONNECT => Some(Event::Disconnect(
-                Peer::new(event_sys.peer),
-                event_sys.data,
-            )),
+            _ENetEventType_ENET_EVENT_TYPE_DISCONNECT => {
+                Some(Event::Disconnect(Peer::new(event_sys.peer), event_sys.data))
+            }
             _ENetEventType_ENET_EVENT_TYPE_RECEIVE => Some(Event::Receive {
                 sender: Peer::new(event_sys.peer),
                 channel_id: event_sys.channelID,
