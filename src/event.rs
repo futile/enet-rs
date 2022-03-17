@@ -53,13 +53,12 @@ impl<'a, T> Event<'a, T> {
 
 impl<'a, T> Drop for Event<'a, T> {
     fn drop(&mut self) {
-        match self {
-            // Seemingly, the lifetime of an ENetPeer ends with the end of the Disconnect event.
-            // However, this is *not really clear* in the ENet docs!
-            // It looks like the Peer *might* live longer, but not shorter, so it should be safe
-            // to destroy the associated data (if any) here.
-            Event::Disconnect(peer, _) => peer.set_data(None),
-            _ => (),
+        // Seemingly, the lifetime of an ENetPeer ends with the end of the Disconnect
+        // event. However, this is *not really clear* in the ENet docs!
+        // It looks like the Peer *might* live longer, but not shorter, so it should be
+        // safe to destroy the associated data (if any) here.
+        if let Event::Disconnect(peer, _) = self {
+            peer.set_data(None)
         }
     }
 }

@@ -27,8 +27,8 @@ pub enum ChannelLimit {
 }
 
 impl ChannelLimit {
-    pub(in crate) fn to_enet_usize(&self) -> usize {
-        match *self {
+    pub(in crate) fn to_enet_usize(self) -> usize {
+        match self {
             ChannelLimit::Maximum => 0,
             ChannelLimit::Limited(l) => l,
         }
@@ -45,8 +45,8 @@ impl ChannelLimit {
 }
 
 impl BandwidthLimit {
-    pub(in crate) fn to_enet_u32(&self) -> u32 {
-        match *self {
+    pub(in crate) fn to_enet_u32(self) -> u32 {
+        match self {
             BandwidthLimit::Unlimited => 0,
             BandwidthLimit::Limited(l) => l,
         }
@@ -138,7 +138,7 @@ impl<T> Host<T> {
         let raw_peers =
             unsafe { std::slice::from_raw_parts_mut((*self.inner).peers, (*self.inner).peerCount) };
 
-        raw_peers.into_iter().map(|rp| Peer::new(rp))
+        raw_peers.iter_mut().map(|rp| Peer::new(rp))
     }
 
     /// Maintains this host and delivers an event if available.

@@ -58,6 +58,8 @@ impl Address {
     }
 
     pub(crate) fn from_enet_address(addr: &ENetAddress) -> Address {
+        // allow `addr.host >> 0`
+        #[allow(clippy::identity_op)]
         Address::new(
             Ipv4Addr::new(
                 (addr.host >> 24) as u8,

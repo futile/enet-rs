@@ -44,7 +44,7 @@ impl PacketMode {
         }
     }
 
-    fn to_sys_flags(&self) -> u32 {
+    fn to_sys_flags(self) -> u32 {
         match self {
             PacketMode::UnreliableSequenced => 0,
             PacketMode::UnreliableUnsequenced => {
@@ -81,7 +81,7 @@ impl Packet {
     }
 
     /// Returns a reference to the bytes inside this packet.
-    pub fn data<'a>(&'a self) -> &'a [u8] {
+    pub fn data(&self) -> &[u8] {
         unsafe { std::slice::from_raw_parts((*self.inner).data, (*self.inner).dataLength) }
     }
 }
