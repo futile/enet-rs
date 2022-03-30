@@ -11,6 +11,11 @@ readme = "README.md"
 keywords = ["network", "gamedev"]
 categories = ["game-engines", "network-programming"]
 license = "Apache-2.0 OR MIT"
+exclude = [
+        ".github/", # ignore github workflows
+        "flake.nix", # ignore nix flake files
+        "flake.lock"
+]
 
 [badges]
 maintenance = { status = "passively-maintained" }
