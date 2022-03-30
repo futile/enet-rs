@@ -2,10 +2,11 @@ extern crate enet;
 
 use std::net::Ipv4Addr;
 
+use anyhow::Context;
 use enet::*;
 
-fn main() {
-    let enet = Enet::new().expect("could not initialize ENet");
+fn main() -> anyhow::Result<()> {
+    let enet = Enet::new().context("could not initialize ENet")?;
 
     let local_addr = Address::new(Ipv4Addr::LOCALHOST, 9001);
 
@@ -17,10 +18,10 @@ fn main() {
             BandwidthLimit::Unlimited,
             BandwidthLimit::Unlimited,
         )
-        .expect("could not create host");
+        .context("could not create host")?;
 
     loop {
-        match host.service(1000).expect("service failed") {
+        match host.service(1000).context("service failed")? {
             Some(Event::Connect(_)) => println!("new connection!"),
             Some(Event::Disconnect(..)) => println!("disconnect!"),
             Some(Event::Receive {

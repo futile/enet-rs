@@ -2,10 +2,11 @@ extern crate enet;
 
 use std::net::Ipv4Addr;
 
+use anyhow::Context;
 use enet::*;
 
-fn main() {
-    let enet = Enet::new().expect("could not initialize ENet");
+fn main() -> anyhow::Result<()> {
+    let enet = Enet::new().context("could not initialize ENet")?;
 
     let mut host = enet
         .create_host::<()>(
@@ -15,13 +16,13 @@ fn main() {
             BandwidthLimit::Unlimited,
             BandwidthLimit::Unlimited,
         )
-        .expect("could not create host");
+        .context("could not create host")?;
 
     host.connect(&Address::new(Ipv4Addr::LOCALHOST, 9001), 10, 0)
-        .expect("connect failed");
+        .context("connect failed")?;
 
     let mut peer = loop {
-        let e = host.service(1000).expect("service failed");
+        let e = host.service(1000).context("service failed")?;
 
         let e = match e {
             Some(ev) => ev,
@@ -39,7 +40,7 @@ fn main() {
                 std::process::exit(0);
             }
             Event::Receive { .. } => {
-                panic!("unexpected Receive-event while waiting for connection")
+                anyhow::bail!("unexpected Receive-event while waiting for connection")
             }
         };
     };
@@ -49,13 +50,13 @@ fn main() {
         Packet::new(b"harro", PacketMode::ReliableSequenced).unwrap(),
         1,
     )
-    .unwrap();
+    .context("sending packet failed")?;
 
     // disconnect after all outgoing packets have been sent.
     peer.disconnect_later(5);
 
     loop {
-        let e = host.service(1000).unwrap();
+        let e = host.service(1000).context("service failed")?;
         println!("received event: {:#?}", e);
     }
 }

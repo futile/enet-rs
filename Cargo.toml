@@ -22,8 +22,8 @@ maintenance = { status = "passively-maintained" }
 
 [dependencies]
 enet-sys = "0.2.3"
-failure = "0.1.8"
-failure_derive = "0.1.8"
+thiserror = "1.0.30"
 
 [dev-dependencies]
+anyhow = "1.0.56"
 lazy_static = "1.4.0"

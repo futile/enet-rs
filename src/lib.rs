@@ -36,9 +36,6 @@
 
 #![warn(missing_docs)]
 
-#[macro_use]
-extern crate failure_derive;
-
 #[cfg(test)]
 #[macro_use]
 extern crate lazy_static;
@@ -94,24 +91,24 @@ pub struct Enet {
 /// Generic ENet error, returned by many API functions.
 ///
 /// Contains the return value of the failed function call.
-#[derive(Fail, Debug)]
-#[fail(display = "enet failure, returned '{}'", _0)]
+#[derive(thiserror::Error, Debug)]
+#[error("enet failure, returned '{}'", .0)]
 pub struct Error(pub c_int);
 
 /// An error that can occur when initializing ENet.
-#[derive(Fail, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum InitializationError {
     /// ENet was already initialized. `Enet::new()` can only (successfully) be
     /// called once, so reuse that object.
-    #[fail(display = "ENet has already been initialized before")]
+    #[error("ENet has already been initialized before")]
     AlreadyInitialized,
     /// ENet was already deinitialized. Probably continue using your previous
     /// `Enet`-instance.
-    #[fail(display = "ENet has already been deinitialized before")]
+    #[error("ENet has already been deinitialized before")]
     AlreadyDeinitialized,
     /// Internal ENet failure (`enet_initialize` failed), containing the return
     /// code.
-    #[fail(display = "enet_initialize failed (with '{}')", _0)]
+    #[error("enet_initialize failed (with '{}')", .0)]
     Error(c_int),
 }
 
