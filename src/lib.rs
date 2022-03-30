@@ -153,7 +153,7 @@ impl Enet {
     pub fn create_host<T>(
         &self,
         address: Option<&Address>,
-        max_peer_count: usize,
+        max_peer_count: enet_sys::size_t,
         max_channel_count: ChannelLimit,
         incoming_bandwidth: BandwidthLimit,
         outgoing_bandwidth: BandwidthLimit,
@@ -165,7 +165,7 @@ impl Enet {
                     .map(|p| p as *const _)
                     .unwrap_or(std::ptr::null()),
                 max_peer_count,
-                max_channel_count.to_enet_usize(),
+                max_channel_count.to_enet_val(),
                 incoming_bandwidth.to_enet_u32(),
                 outgoing_bandwidth.to_enet_u32(),
             )

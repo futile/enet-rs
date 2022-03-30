@@ -30,7 +30,7 @@ Installation is as simple as adding this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-enet = "0.2.4"
+enet = "0.3.0"
 ```
 
 ## Documentation & Examples

@@ -58,9 +58,14 @@ impl PacketMode {
 impl Packet {
     /// Creates a new Packet with optional reliability settings.
     pub fn new(data: &[u8], mode: PacketMode) -> Result<Packet, Error> {
-        let res = unsafe {
-            enet_packet_create(data.as_ptr() as *const _, data.len(), mode.to_sys_flags())
-        };
+        let data_len: enet_sys::size_t = data
+            .len()
+            .try_into()
+            // this can only happen on 64-bit systems if `size_t` is 32-bit wide (windows?)
+            .expect("packet data too long for ENet (`size_t`)");
+
+        let res =
+            unsafe { enet_packet_create(data.as_ptr() as *const _, data_len, mode.to_sys_flags()) };
 
         if res.is_null() {
             return Err(Error(0));
@@ -82,7 +87,17 @@ impl Packet {
 
     /// Returns a reference to the bytes inside this packet.
     pub fn data(&self) -> &[u8] {
-        unsafe { std::slice::from_raw_parts((*self.inner).data, (*self.inner).dataLength) }
+        unsafe {
+            std::slice::from_raw_parts(
+                (*self.inner).data,
+                (*self.inner)
+                    .dataLength
+                    .try_into()
+                    // this can only happen when a too long packet is received on a 32-bit system I
+                    // think
+                    .expect("packet data too long for an `usize`"),
+            )
+        }
     }
 }
 

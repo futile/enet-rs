@@ -1,6 +1,6 @@
 [package]
 name = "enet"
-version = "0.2.4"
+version = "0.3.0"
 authors = ["Felix Rath <felixm.rath@gmail.com>"]
 edition = "2021"
 description = "High-level, rust-y bindings to the ENet library"
@@ -21,7 +21,7 @@ exclude = [
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-enet-sys = "0.2.3"
+enet-sys = "1.0.0"
 thiserror = "1.0.30"
 
 [dev-dependencies]

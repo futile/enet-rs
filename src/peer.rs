@@ -97,7 +97,7 @@ impl<'a, T> Peer<'a, T> {
     }
 
     /// Returns the amout of channels allocated for this `Peer`.
-    pub fn channel_count(&self) -> usize {
+    pub fn channel_count(&self) -> enet_sys::size_t {
         unsafe { (*self.inner).channelCount }
     }
 

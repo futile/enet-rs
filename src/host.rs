@@ -23,19 +23,19 @@ pub enum ChannelLimit {
     /// Maximum limit on the number of channels
     Maximum,
     /// Channel limit
-    Limited(usize),
+    Limited(enet_sys::size_t),
 }
 
 impl ChannelLimit {
-    pub(in crate) fn to_enet_usize(self) -> usize {
+    pub(in crate) fn to_enet_val(self) -> enet_sys::size_t {
         match self {
             ChannelLimit::Maximum => 0,
             ChannelLimit::Limited(l) => l,
         }
     }
 
-    fn from_enet_usize(enet_val: usize) -> ChannelLimit {
-        const MAX_COUNT: usize = ENET_PROTOCOL_MAXIMUM_CHANNEL_COUNT as usize;
+    fn from_enet_val(enet_val: enet_sys::size_t) -> ChannelLimit {
+        const MAX_COUNT: enet_sys::size_t = ENET_PROTOCOL_MAXIMUM_CHANNEL_COUNT as enet_sys::size_t;
         match enet_val {
             MAX_COUNT => ChannelLimit::Maximum,
             0 => panic!("ChannelLimit::from_enet_usize: got 0"),
@@ -104,13 +104,13 @@ impl<T> Host<T> {
     /// Sets the maximum allowed channels of future connections.
     pub fn set_channel_limit(&mut self, max_channel_count: ChannelLimit) {
         unsafe {
-            enet_host_channel_limit(self.inner, max_channel_count.to_enet_usize());
+            enet_host_channel_limit(self.inner, max_channel_count.to_enet_val());
         }
     }
 
     /// Returns the limit of channels per connected peer for this `Host`.
     pub fn channel_limit(&self) -> ChannelLimit {
-        ChannelLimit::from_enet_usize(unsafe { (*self.inner).channelLimit })
+        ChannelLimit::from_enet_val(unsafe { (*self.inner).channelLimit })
     }
 
     /// Returns the downstream bandwidth of this `Host` in bytes/second.
@@ -129,14 +129,17 @@ impl<T> Host<T> {
     }
 
     /// Returns the number of peers allocated for this `Host`.
-    pub fn peer_count(&self) -> usize {
+    pub fn peer_count(&self) -> enet_sys::size_t {
         unsafe { (*self.inner).peerCount }
     }
 
     /// Returns an iterator over all peers connected to this `Host`.
     pub fn peers(&'_ mut self) -> impl Iterator<Item = Peer<'_, T>> {
-        let raw_peers =
-            unsafe { std::slice::from_raw_parts_mut((*self.inner).peers, (*self.inner).peerCount) };
+        // this should only fail on 32-bit platfroms when `size_t` is 64-bit, which
+        // should be super rare
+        let peer_count = unsafe { (*self.inner).peerCount.try_into().expect("too many peers") };
+
+        let raw_peers = unsafe { std::slice::from_raw_parts_mut((*self.inner).peers, peer_count) };
 
         raw_peers.iter_mut().map(|rp| Peer::new(rp))
     }
@@ -190,7 +193,7 @@ impl<T> Host<T> {
     pub fn connect(
         &mut self,
         address: &Address,
-        channel_count: usize,
+        channel_count: enet_sys::size_t,
         user_data: u32,
     ) -> Result<Peer<'_, T>, Error> {
         let res: *mut ENetPeer = unsafe {
