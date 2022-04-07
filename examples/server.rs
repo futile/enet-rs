@@ -1,11 +1,12 @@
 extern crate enet;
 
+use anyhow::Context;
 use enet::*;
 use std::net::Ipv4Addr;
 use std::time::Duration;
 
-fn main() {
-    let enet = Enet::new().expect("could not initialize ENet");
+fn main() -> anyhow::Result<()> {
+    let enet = Enet::new().context("could not initialize ENet")?;
 
     let local_addr = Address::new(Ipv4Addr::LOCALHOST, 9001);
 
@@ -17,13 +18,13 @@ fn main() {
             BandwidthLimit::Unlimited,
             BandwidthLimit::Unlimited,
         )
-        .expect("could not create host");
+        .context("could not create host")?;
 
     loop {
         // Wait 500 ms for any events.
         if let Some(Event { kind, .. }) = host
-            .service(Duration::from_millis(500))
-            .expect("service failed")
+            .service(Duration::from_secs(1))
+            .context("service failed")?
         {
             match kind {
                 EventKind::Connect => println!("new connection!"),

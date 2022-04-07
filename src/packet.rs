@@ -21,7 +21,8 @@ pub enum PacketMode {
     UnreliableSequenced,
     /// The packet will be sent unreliably and unsequenced.
     UnreliableUnsequenced,
-    /// The packet will be sent reliably and sequenced with other reliable packets.
+    /// The packet will be sent reliably and sequenced with other reliable
+    /// packets.
     ReliableSequenced,
 }
 
@@ -44,7 +45,7 @@ impl PacketMode {
         }
     }
 
-    fn to_sys_flags(&self) -> u32 {
+    fn to_sys_flags(self) -> u32 {
         match self {
             PacketMode::UnreliableSequenced => 0,
             PacketMode::UnreliableUnsequenced => {
@@ -63,7 +64,7 @@ impl Packet {
         let res = unsafe {
             enet_packet_create(
                 data.as_ptr() as *const _,
-                data.len(),
+                data.len() as enet_sys::size_t,
                 mode.to_sys_flags() | _ENetPacketFlag_ENET_PACKET_FLAG_NO_ALLOCATE,
             )
         };
@@ -96,8 +97,18 @@ impl Packet {
     }
 
     /// Returns a reference to the bytes inside this packet.
-    pub fn data<'a>(&'a self) -> &'a [u8] {
-        unsafe { std::slice::from_raw_parts((*self.inner).data, (*self.inner).dataLength) }
+    pub fn data(&self) -> &[u8] {
+        unsafe {
+            std::slice::from_raw_parts(
+                (*self.inner).data,
+                (*self.inner)
+                    .dataLength
+                    .try_into()
+                    // this can only happen when a too long packet is received on a 32-bit system I
+                    // think
+                    .expect("packet data too long for an `usize`"),
+            )
+        }
     }
 }
 
@@ -112,7 +123,7 @@ impl Drop for Packet {
 unsafe extern "C" fn packet_free_callback(packet: *mut ENetPacket) {
     drop(Vec::<u8>::from_raw_parts(
         (*packet).data,
-        (*packet).dataLength,
+        (*packet).dataLength as usize,
         (*packet).userData as usize,
     ));
 }

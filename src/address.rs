@@ -1,9 +1,11 @@
-use std::ffi::CStr;
-use std::net::{Ipv4Addr, SocketAddrV4};
-
-use crate::Error;
+use std::{
+    ffi::CStr,
+    net::{Ipv4Addr, SocketAddrV4},
+};
 
 use enet_sys::ENetAddress;
+
+use crate::Error;
 
 /// An IPv4 address that can be used with the ENet API.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -32,10 +34,7 @@ impl Address {
             return Err(Error(res));
         }
 
-        Ok(Address::new(
-            Ipv4Addr::from(u32::from_be(addr.host)),
-            addr.port,
-        ))
+        Ok(Self::from_enet_address(&addr))
     }
 
     /// Return the ip of this address
@@ -50,21 +49,17 @@ impl Address {
 
     pub(crate) fn to_enet_address(&self) -> ENetAddress {
         ENetAddress {
-            host: u32::from_be_bytes(self.ip().octets()).to_be(),
+            // Use native byte order here, the octets are already arranged in the correct byte
+            // order, don't change it
+            host: u32::from_ne_bytes(self.ip().octets()),
             port: self.port(),
         }
     }
 
     pub(crate) fn from_enet_address(addr: &ENetAddress) -> Address {
-        Address::new(
-            Ipv4Addr::new(
-                (addr.host >> 24) as u8,
-                (addr.host >> 16) as u8,
-                (addr.host >> 8) as u8,
-                (addr.host >> 0) as u8,
-            ),
-            addr.port,
-        )
+        // Split using native byte order here, as Enet guarantees that our bytes are
+        // already layed out in network byte order.
+        Address::new(Ipv4Addr::from(addr.host.to_ne_bytes()), addr.port)
     }
 }
 
@@ -76,10 +71,9 @@ impl From<SocketAddrV4> for Address {
 
 #[cfg(test)]
 mod tests {
-    use super::Address;
+    use std::{ffi::CString, net::Ipv4Addr};
 
-    use std::ffi::CString;
-    use std::net::Ipv4Addr;
+    use super::Address;
 
     #[test]
     fn test_from_valid_hostname() {

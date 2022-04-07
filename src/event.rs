@@ -31,7 +31,7 @@ pub enum EventKind {
     Receive {
         /// ID of the channel that the packet was received on.
         channel_id: u8,
-        /// The received packet.
+        /// The `Packet` that was received.
         packet: Packet,
     },
 }
@@ -52,7 +52,7 @@ impl Event {
                 channel_id: event_sys.channelID,
                 packet: Packet::from_sys_packet(event_sys.packet),
             },
-            _ => panic!("unexpected event type: {}", event_sys.type_),
+            _ => panic!("unrecognized event type: {}", event_sys.type_),
         };
 
         Some(Event { peer_id, kind })

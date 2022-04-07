@@ -30,13 +30,13 @@ Installation is as simple as adding this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-enet = "0.1"
+enet = "0.3.0"
 ```
 
 ## Documentation & Examples
 
-Documentation is available by running `cargo doc`. An example server and client
-can be found in the `examples` directory.
+Documentation is available on https://docs.rs/enet or by running `cargo doc`.
+An example server and client can be found in the `examples` directory.
 
 ## License
 

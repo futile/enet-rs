@@ -1,6 +1,8 @@
-use std::fmt::{self, Debug, Formatter};
-use std::marker::PhantomData;
-use std::time::Duration;
+use std::{
+    fmt::{self, Debug, Formatter},
+    marker::PhantomData,
+    time::Duration,
+};
 
 use enet_sys::{
     enet_peer_disconnect, enet_peer_disconnect_later, enet_peer_disconnect_now, enet_peer_receive,
@@ -27,12 +29,14 @@ use crate::{Address, Error, Packet};
 #[repr(transparent)]
 pub struct Peer<T> {
     inner: ENetPeer,
+
     _data: PhantomData<T>,
 }
 
 /// A packet received directly from a `Peer`.
 ///
-/// Contains the received packet as well as the channel on which it was received.
+/// Contains the received packet as well as the channel on which it was
+/// received.
 #[derive(Debug)]
 pub struct PeerPacket {
     /// The packet that was received.
@@ -46,10 +50,15 @@ where
     T: 'a,
 {
     pub(crate) fn new(inner: &'a ENetPeer) -> &'a Peer<T> {
+        // Safety:
+        // This code interprets the `ENetPeer` reference as a `Peer` reference instead.
+        // As `Peer` is `repr(transparent)` and we only return a reference, so the `Peer`
+        // can't be moved, this is safe.
         unsafe { &*(inner as *const _ as *const Peer<T>) }
     }
 
     pub(crate) fn new_mut(inner: &'a mut ENetPeer) -> &'a mut Peer<T> {
+        // Safety: See `new`
         unsafe { &mut *(inner as *mut _ as *mut Peer<T>) }
     }
 
@@ -59,7 +68,7 @@ where
     }
 
     /// Returns the amout of channels allocated for this `Peer`.
-    pub fn channel_count(&self) -> usize {
+    pub fn channel_count(&self) -> enet_sys::size_t {
         self.inner.channelCount
     }
 
@@ -155,29 +164,29 @@ where
     /// Disconnects from this peer.
     ///
     /// A `Disconnect` event will be returned by `Host::service` once the disconnection is complete.
-    pub fn disconnect(&mut self, data: u32) {
+    pub fn disconnect(&mut self, user_data: u32) {
         unsafe {
-            enet_peer_disconnect(&mut self.inner as *mut _, data);
+            enet_peer_disconnect(&mut self.inner as *mut _, user_data);
         }
     }
 
     /// Disconnects from this peer immediately.
     ///
     /// No `Disconnect` event will be created. No disconnect notification for the foreign peer is guaranteed, and this `Peer` is immediately reset on return from this method.
-    pub fn disconnect_now(&mut self, data: u32) {
+    pub fn disconnect_now(&mut self, user_data: u32) {
         self.set_data(None);
 
         unsafe {
-            enet_peer_disconnect_now(&mut self.inner as *mut _, data);
+            enet_peer_disconnect_now(&mut self.inner as *mut _, user_data);
         }
     }
 
     /// Disconnects from this peer after all outgoing packets have been sent.
     ///
     /// A `Disconnect` event will be returned by `Host::service` once the disconnection is complete.
-    pub fn disconnect_later(&mut self, data: u32) {
+    pub fn disconnect_later(&mut self, user_data: u32) {
         unsafe {
-            enet_peer_disconnect_later(&mut self.inner as *mut _, data);
+            enet_peer_disconnect_later(&mut self.inner as *mut _, user_data);
         }
     }
 
@@ -216,11 +225,12 @@ where
 ///
 /// When connecting to a host, both a reference to the host, and it's ID are returned.
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
-pub struct PeerID(pub(crate) usize);
+pub struct PeerID(pub(crate) enet_sys::size_t);
 
 /// Describes the state a `Peer` is in.
 ///
-/// The states should be self-explanatory, ENet doesn't explain them more either.
+/// The states should be self-explanatory, ENet doesn't explain them more
+/// either.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 #[allow(missing_docs)]
 pub enum PeerState {
