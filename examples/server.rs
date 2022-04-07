@@ -22,14 +22,17 @@ fn main() -> anyhow::Result<()> {
 
     loop {
         // Wait 500 ms for any events.
-        if let Some(Event { kind, .. }) = host
+        if let Some(event) = host
             .service(Duration::from_secs(1))
             .context("service failed")?
         {
-            match kind {
-                EventKind::Connect => println!("new connection!"),
-                EventKind::Disconnect { .. } => println!("disconnect!"),
-                EventKind::Receive { channel_id, packet } => println!(
+            match event.kind() {
+                &EventKind::Connect => println!("new connection!"),
+                &EventKind::Disconnect { .. } => println!("disconnect!"),
+                &EventKind::Receive {
+                    ref channel_id,
+                    ref packet,
+                } => println!(
                     "got packet on channel {}, content: '{}'",
                     channel_id,
                     std::str::from_utf8(packet.data()).unwrap()

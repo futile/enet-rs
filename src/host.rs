@@ -6,7 +6,7 @@ use enet_sys::{
     ENET_PROTOCOL_MAXIMUM_CHANNEL_COUNT,
 };
 
-use crate::{Address, EnetKeepAlive, Error, Event, EventKind, Peer, PeerID};
+use crate::{Address, EnetKeepAlive, Error, Event, Peer, PeerID};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 /// Represents a bandwidth limit or unlimited.
@@ -60,7 +60,6 @@ impl BandwidthLimit {
 /// transmission.
 pub struct Host<T> {
     inner: *mut ENetHost,
-    disconnect_drop: Option<PeerID>,
     _keep_alive: Arc<EnetKeepAlive>,
     _peer_data: PhantomData<*const T>,
 }
@@ -71,7 +70,6 @@ impl<T> Host<T> {
 
         Host {
             inner,
-            disconnect_drop: None,
             _keep_alive,
             _peer_data: PhantomData,
         }
@@ -134,33 +132,41 @@ impl<T> Host<T> {
         unsafe { (*self.inner).peerCount }
     }
 
-    /// Returns a mutable reference to a peer at the index, None if the index is invalid.
+    /// Returns a mutable reference to a peer at the given PeerID, None if the index is invalid.
     pub fn peer_mut(&mut self, idx: PeerID) -> Option<&mut Peer<T>> {
-        if idx.0 >= self.peer_count() {
+        if !(0..self.peer_count() as isize).contains(&idx.index) {
             return None;
         }
 
-        Some(Peer::new_mut(unsafe {
-            &mut *((*self.inner).peers.offset(idx.0 as isize))
-        }))
+        let peer = Peer::new_mut(unsafe { &mut *((*self.inner).peers.offset(idx.index)) });
+        if peer.generation() != idx.generation {
+            return None;
+        }
+
+        Some(peer)
     }
 
-    /// Returns a reference to a peer at the index, None if the index is invalid.
+    /// Returns a reference to a peer at the given PeerID, None if the index is invalid.
     pub fn peer(&self, idx: PeerID) -> Option<&Peer<T>> {
-        if idx.0 >= self.peer_count() {
+        if !(0..self.peer_count() as isize).contains(&idx.index) {
             return None;
         }
 
-        Some(Peer::new(unsafe {
-            &*((*self.inner).peers.offset(idx.0 as isize))
-        }))
+        let peer = Peer::new(unsafe { &*((*self.inner).peers.offset(idx.index)) });
+        if peer.generation() != idx.generation {
+            return None;
+        }
+
+        Some(peer)
     }
 
     pub(crate) unsafe fn peer_id(&self, peer: *mut ENetPeer) -> PeerID {
-        PeerID(
-            (peer as enet_sys::size_t - (*self.inner).peers as enet_sys::size_t)
-                / std::mem::size_of::<ENetPeer>() as enet_sys::size_t,
-        )
+        let index = peer.offset_from((*self.inner).peers);
+        let peer = Peer::<T>::new_mut(&mut *peer);
+        PeerID {
+            index,
+            generation: peer.generation(),
+        }
     }
 
     /// Returns an iterator over all peers connected to this `Host`.
@@ -187,31 +193,8 @@ impl<T> Host<T> {
         peers.iter().map(|peer| Peer::new(&*peer))
     }
 
-    fn drop_disconnected(&mut self) {
-        // Seemingly, the lifetime of an ENetPeer ends when the Disconnect event is received.
-        // However, this is *not really clear* in the ENet docs!
-        // It looks like the Peer *might* live longer, but not shorter, so it should be safe
-        // to destroy the associated data (if any) here.
-        if let Some(idx) = self.disconnect_drop.take() {
-            self.peer_mut(idx)
-                .expect("Invalid PeerID in disconnect_drop in enet::Host")
-                .set_data(None);
-        }
-    }
-
-    fn process_event(&mut self, sys_event: ENetEvent) -> Option<Event> {
-        self.drop_disconnected();
-
-        let event = Event::from_sys_event(sys_event, self);
-        if let Some(Event {
-            peer_id,
-            kind: EventKind::Disconnect { .. },
-        }) = event
-        {
-            self.disconnect_drop = Some(peer_id);
-        }
-
-        event
+    fn process_event(&'_ mut self, sys_event: ENetEvent) -> Option<Event<'_, T>> {
+        Event::from_sys_event(sys_event, self)
     }
 
     /// Maintains this host and delivers an event if available.
@@ -219,7 +202,7 @@ impl<T> Host<T> {
     /// This should be called regularly for ENet to work properly with good performance.
     ///
     /// The function won't block if `timeout` is less than 1ms.
-    pub fn service(&mut self, timeout: Duration) -> Result<Option<Event>, Error> {
+    pub fn service(&'_ mut self, timeout: Duration) -> Result<Option<Event<'_, T>>, Error> {
         // ENetEvent is Copy (aka has no Drop impl), so we don't have to make sure we `mem::forget` it later on
         let mut sys_event = MaybeUninit::uninit();
 
@@ -244,7 +227,7 @@ impl<T> Host<T> {
 
     /// Checks for any queued events on this `Host` and dispatches one if
     /// available
-    pub fn check_events(&mut self) -> Result<Option<Event>, Error> {
+    pub fn check_events(&'_ mut self) -> Result<Option<Event<'_, T>>, Error> {
         // ENetEvent is Copy (aka has no Drop impl), so we don't have to make sure we
         // `mem::forget` it later on
         let mut sys_event = MaybeUninit::uninit();
@@ -298,7 +281,7 @@ impl<T> Drop for Host<T> {
     /// Call the corresponding ENet cleanup-function(s).
     fn drop(&mut self) {
         for peer in self.peers_mut() {
-            peer.set_data(None);
+            peer.drop_raw_data();
         }
 
         unsafe {

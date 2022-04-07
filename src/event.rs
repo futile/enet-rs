@@ -4,15 +4,14 @@ use enet_sys::{
     _ENetEventType_ENET_EVENT_TYPE_NONE, _ENetEventType_ENET_EVENT_TYPE_RECEIVE,
 };
 
-use crate::{Host, Packet, PeerID};
+use crate::{Host, Packet, Peer, PeerID};
 
 /// This struct represents an event that can occur when servicing an `Host`.
 #[derive(Debug)]
-pub struct Event {
-    /// The peer that this event happened on.
-    pub peer_id: PeerID,
-    /// The type of this event.
-    pub kind: EventKind,
+pub struct Event<'a, T> {
+    peer: &'a mut Peer<T>,
+    peer_id: PeerID,
+    kind: EventKind,
 }
 
 /// The type of an event.
@@ -22,7 +21,7 @@ pub enum EventKind {
     Connect,
     /// Peer has disconnected.
     //
-    /// The data of the peer will be dropped on the next call to Host::service or when the structure is dropped.
+    /// The data of the peer will be dropped when the received `Event` is dropped.
     Disconnect {
         /// The data associated with this event. Usually a reason for disconnection.
         data: u32,
@@ -36,12 +35,13 @@ pub enum EventKind {
     },
 }
 
-impl Event {
-    pub(crate) fn from_sys_event<T>(event_sys: ENetEvent, host: &Host<T>) -> Option<Event> {
+impl<'a, T> Event<'a, T> {
+    pub(crate) fn from_sys_event(event_sys: ENetEvent, host: &'a Host<T>) -> Option<Event<'a, T>> {
         if event_sys.type_ == _ENetEventType_ENET_EVENT_TYPE_NONE {
             return None;
         }
 
+        let peer = unsafe { Peer::new_mut(&mut *event_sys.peer) };
         let peer_id = unsafe { host.peer_id(event_sys.peer) };
         let kind = match event_sys.type_ {
             _ENetEventType_ENET_EVENT_TYPE_CONNECT => EventKind::Connect,
@@ -55,6 +55,61 @@ impl Event {
             _ => panic!("unrecognized event type: {}", event_sys.type_),
         };
 
-        Some(Event { peer_id, kind })
+        Some(Event {
+            peer,
+            peer_id,
+            kind,
+        })
+    }
+
+    /// The peer that this event happened on.
+    pub fn peer(&'_ self) -> &'_ Peer<T> {
+        &*self.peer
+    }
+
+    /// The peer that this event happened on.
+    pub fn peer_mut(&'_ mut self) -> &'_ mut Peer<T> {
+        self.peer
+    }
+
+    /// The `PeerID` of the peer that this event happened on.
+    pub fn peer_id(&self) -> PeerID {
+        self.peer_id
+    }
+
+    /// The type of this event.
+    pub fn kind(&self) -> &EventKind {
+        &self.kind
+    }
+
+    /// Take the EventKind out of this event.
+    /// If this peer is a Disconnect event, it will clean up the Peer.
+    /// See the `Drop` implementation
+    pub fn take_kind(mut self) -> EventKind {
+        // Unfortunately we can't simply take the `kind` out of the Event, as otherwise the `Drop`
+        // implementation would no longer work.
+        // We can however, swap the actual EventKind with an empty EventKind (in this case
+        // Connect).
+        // As the `Drop` implementation will then do nothing, we need to call cleanup_after_disconnect before we do the swap.
+        self.cleanup_after_disconnect();
+
+        let mut kind = EventKind::Connect;
+        std::mem::swap(&mut kind, &mut self.kind);
+        kind
+    }
+
+    fn cleanup_after_disconnect(&mut self) {
+        match self.kind {
+            EventKind::Disconnect { .. } => self.peer.cleanup_after_disconnect(),
+            EventKind::Connect | EventKind::Receive { .. } => {}
+        }
+    }
+}
+
+/// Dropping an `Event` with `EventKind::Disconnect` will clean up the Peer, by dropping
+/// the data associated with the `Peer`, as well as invalidating the `PeerID`.
+impl<'a, T> Drop for Event<'a, T> {
+    fn drop(&mut self) {
+        self.cleanup_after_disconnect();
     }
 }

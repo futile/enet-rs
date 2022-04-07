@@ -34,12 +34,13 @@ fn main() -> anyhow::Result<()> {
 
         println!("[client] event: {:#?}", e);
 
-        match e.kind {
-            EventKind::Connect => break e.peer_id,
+        match e.kind() {
+            EventKind::Connect => break e.peer_id(),
             EventKind::Disconnect { data } => {
                 println!(
                     "connection NOT successful, peer: {:?}, reason: {}",
-                    e.peer_id, data
+                    e.peer_id(),
+                    data
                 );
                 std::process::exit(0);
             }

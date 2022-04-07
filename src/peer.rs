@@ -20,17 +20,33 @@ use crate::{Address, Error, Packet};
 
 /// This struct represents an endpoint in an ENet-connection.
 ///
-/// The lifetime of these instances is not really clear from the ENet documentation.
+/// A `Peer` is owned by the `Host` it is returned from.
 /// Therefore, `Peer`s are always borrowed, and can not really be stored anywhere.
 /// For this purpose, use [PeerID](struct.PeerID.html) instead.
 ///
 /// ENet allows the association of arbitrary data with each peer.
 /// The type of this associated data is chosen through `T`.
+///
+/// ## Peer lifetimes
+/// An enet `Peer` technically has the same lifetime as the Host it belongs to.
+/// This however also means that a Peer may be ill-defined state, when it does not currently
+/// represent an active connection.
+///
+/// With enet-rs, a specific `PeerID` will only ever reference a `Peer` that corresponds to an
+/// active connection.
+/// As soon as an `Event` that contains an `EventKind::Disconnect` is dropped, the `PeerID` of the
+/// corresponding `Peer` will be invalidated.
+/// The data associated with a Peer will also be dropped at that point.
 #[repr(transparent)]
 pub struct Peer<T> {
     inner: ENetPeer,
 
     _data: PhantomData<T>,
+}
+
+struct PeerData<T> {
+    peer_generation: usize,
+    user_data: Option<T>,
 }
 
 /// A packet received directly from a `Peer`.
@@ -72,10 +88,9 @@ where
         self.inner.channelCount
     }
 
-    /// Returns a reference to the data associated with this `Peer`, if set.
-    pub fn data(&self) -> Option<&T> {
+    fn raw_data(&self) -> Option<&PeerData<T>> {
         unsafe {
-            let raw_data = self.inner.data as *const T;
+            let raw_data = self.inner.data as *const PeerData<T>;
 
             if raw_data.is_null() {
                 None
@@ -85,36 +100,74 @@ where
         }
     }
 
-    /// Returns a mutable reference to the data associated with this `Peer`, if set.
-    pub fn data_mut(&mut self) -> Option<&mut T> {
+    // automatically initializes the Peer Data if it doesn't exist
+    fn raw_data_mut(&mut self) -> &mut PeerData<T> {
         unsafe {
-            let raw_data = self.inner.data as *mut T;
+            let mut raw_data = self.inner.data as *mut PeerData<T>;
 
             if raw_data.is_null() {
-                None
-            } else {
-                Some(&mut (*raw_data))
+                raw_data = Box::into_raw(Box::new(PeerData {
+                    peer_generation: 0,
+                    user_data: None,
+                }));
+                self.inner.data = raw_data as *mut _;
+            }
+
+            &mut (*raw_data)
+        }
+    }
+
+    pub(crate) fn drop_raw_data(&mut self) {
+        let raw_data = self.inner.data as *mut PeerData<T>;
+
+        if !raw_data.is_null() {
+            unsafe {
+                drop(Box::from_raw(raw_data));
             }
         }
     }
 
-    /// Sets or clears the data associated with this `Peer`, replacing existing data.
-    pub fn set_data(&mut self, data: Option<T>) {
-        unsafe {
-            let raw_data = self.inner.data as *mut T;
-
-            if !raw_data.is_null() {
-                // free old data
-                let _: Box<T> = Box::from_raw(raw_data);
-            }
-
-            let new_data = match data {
-                Some(data) => Box::into_raw(Box::new(data)) as *mut _,
-                None => std::ptr::null_mut(),
-            };
-
-            self.inner.data = new_data;
+    pub(crate) fn generation(&self) -> usize {
+        if let Some(peer_data) = self.raw_data() {
+            peer_data.peer_generation
+        } else {
+            0
         }
+    }
+
+    /// This will do all necessary cleanup after a Peer
+    /// has been disconnected, including increasing the generation,
+    /// as well as dropping the data associated with this peer.
+    pub(crate) fn cleanup_after_disconnect(&mut self) {
+        self.raw_data_mut().peer_generation += 1;
+        self.take_data();
+    }
+
+    /// Returns a reference to the data associated with this `Peer`, if set.
+    pub fn data(&self) -> Option<&T> {
+        if let Some(peer_data) = self.raw_data() {
+            peer_data.user_data.as_ref()
+        } else {
+            None
+        }
+    }
+
+    /// Returns a mutable reference to the data associated with this `Peer`, if set.
+    pub fn data_mut(&mut self) -> Option<&mut T> {
+        self.raw_data_mut().user_data.as_mut()
+    }
+
+    /// Sets the data associated with this `Peer`, replacing existing data.
+    ///
+    /// To clear the data associated with this Peer, use `take_data` instead.
+    pub fn set_data(&mut self, data: T) {
+        self.raw_data_mut().user_data = Some(data);
+    }
+
+    /// Take the data associated with this `Peer` out of it.
+    /// No more data will be associated with this Peer after this call.
+    pub fn take_data(&mut self) -> Option<T> {
+        self.raw_data_mut().user_data.take()
     }
 
     /// Returns the downstream bandwidth of this `Peer` in bytes/second.
@@ -172,13 +225,18 @@ where
 
     /// Disconnects from this peer immediately.
     ///
-    /// No `Disconnect` event will be created. No disconnect notification for the foreign peer is guaranteed, and this `Peer` is immediately reset on return from this method.
-    pub fn disconnect_now(&mut self, user_data: u32) {
-        self.set_data(None);
-
+    /// No `Disconnect` event will be created.
+    /// No disconnect notification for the foreign peer is guaranteed, and this
+    /// `Peer` is immediately reset on return from this method.
+    ///
+    /// Any `PeerID` referencing this `Peer` will be invalid after this method is executed and all
+    /// data associated with this `Peer` will be dropped.
+    pub fn disconnect_now(mut self, user_data: u32) {
         unsafe {
             enet_peer_disconnect_now(&mut self.inner as *mut _, user_data);
         }
+        // Because no disconnect event is received, we have to clean up manually here.
+        self.cleanup_after_disconnect();
     }
 
     /// Disconnects from this peer after all outgoing packets have been sent.
@@ -223,9 +281,12 @@ where
 /// As the lifetime semantics of Peers aren't clear in Enet and they cannot be owned, PeerID's are the
 /// primary way of storing owned references to Peers.
 ///
-/// When connecting to a host, both a reference to the host, and it's ID are returned.
+/// When connecting to a host, both a reference to the peer, and its ID are returned.
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
-pub struct PeerID(pub(crate) enet_sys::size_t);
+pub struct PeerID {
+    pub(crate) index: isize,
+    pub(crate) generation: usize,
+}
 
 /// Describes the state a `Peer` is in.
 ///
