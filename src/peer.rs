@@ -193,7 +193,7 @@ where
     /// Attempts to dequeue an incoming packet from this `Peer`.
     ///
     /// On success, returns the packet and the channel id of the receiving channel.
-    pub fn receive<'b>(&mut self) -> Option<PeerPacket> {
+    pub fn receive(&mut self) -> Option<PeerPacket> {
         let mut channel_id = 0u8;
         let res =
             unsafe { enet_peer_receive(&mut self.inner as *mut _, &mut channel_id as *mut _) };

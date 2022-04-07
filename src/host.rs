@@ -1,10 +1,4 @@
-use std::{
-    marker::PhantomData,
-    mem::MaybeUninit,
-    ops::{Index, IndexMut},
-    sync::Arc,
-    time::Duration,
-};
+use std::{marker::PhantomData, mem::MaybeUninit, sync::Arc, time::Duration};
 
 use enet_sys::{
     enet_host_bandwidth_limit, enet_host_channel_limit, enet_host_check_events, enet_host_connect,
@@ -178,7 +172,7 @@ impl<T> Host<T> {
             )
         };
 
-        peers.into_iter().map(|peer| Peer::new_mut(&mut *peer))
+        peers.iter_mut().map(|peer| Peer::new_mut(&mut *peer))
     }
 
     /// Returns an iterator over all peers connected to this `Host`.
@@ -190,7 +184,7 @@ impl<T> Host<T> {
             )
         };
 
-        peers.into_iter().map(|peer| Peer::new(&*peer))
+        peers.iter().map(|peer| Peer::new(&*peer))
     }
 
     fn drop_disconnected(&mut self) {
@@ -297,20 +291,6 @@ impl<T> Host<T> {
             // list of peers, which is it's PeerID.
             unsafe { self.peer_id(res) },
         ))
-    }
-}
-
-impl<T> Index<PeerID> for Host<T> {
-    type Output = Peer<T>;
-
-    fn index(&self, idx: PeerID) -> &Peer<T> {
-        self.peer(idx).expect("invalid peer index")
-    }
-}
-
-impl<T> IndexMut<PeerID> for Host<T> {
-    fn index_mut(&mut self, idx: PeerID) -> &mut Peer<T> {
-        self.peer_mut(idx).expect("invalid peer index")
     }
 }
 

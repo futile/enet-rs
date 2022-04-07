@@ -49,16 +49,16 @@ fn main() -> anyhow::Result<()> {
         };
     };
 
+    let peer = host.peer_mut(peer_id).unwrap();
     // send a "hello"-like packet
-    host[peer_id]
-        .send_packet(
-            Packet::new(b"harro".to_vec(), PacketMode::ReliableSequenced).unwrap(),
-            1,
-        )
-        .context("sending packet failed")?;
+    peer.send_packet(
+        Packet::new(b"harro".to_vec(), PacketMode::ReliableSequenced).unwrap(),
+        1,
+    )
+    .context("sending packet failed")?;
 
     // disconnect after all outgoing packets have been sent.
-    host[peer_id].disconnect_later(5);
+    peer.disconnect_later(5);
 
     loop {
         let e = host
