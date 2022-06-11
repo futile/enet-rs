@@ -4,6 +4,7 @@ use std::net::Ipv4Addr;
 
 use anyhow::Context;
 use enet::*;
+use std::time::Duration;
 
 fn main() -> anyhow::Result<()> {
     let enet = Enet::new().context("could not initialize ENet")?;
@@ -21,8 +22,10 @@ fn main() -> anyhow::Result<()> {
     host.connect(&Address::new(Ipv4Addr::LOCALHOST, 9001), 10, 0)
         .context("connect failed")?;
 
-    let mut peer = loop {
-        let e = host.service(1000).context("service failed")?;
+    let peer_id = loop {
+        let e = host
+            .service(Duration::from_secs(1))
+            .expect("service failed");
 
         let e = match e {
             Some(ev) => ev,
@@ -31,23 +34,26 @@ fn main() -> anyhow::Result<()> {
 
         println!("[client] event: {:#?}", e);
 
-        match e {
-            Event::Connect(ref p) => {
-                break p.clone();
-            }
-            Event::Disconnect(ref p, r) => {
-                println!("connection NOT successful, peer: {:?}, reason: {}", p, r);
+        match e.kind() {
+            EventKind::Connect => break e.peer_id(),
+            EventKind::Disconnect { data } => {
+                println!(
+                    "connection NOT successful, peer: {:?}, reason: {}",
+                    e.peer_id(),
+                    data
+                );
                 std::process::exit(0);
             }
-            Event::Receive { .. } => {
+            EventKind::Receive { .. } => {
                 anyhow::bail!("unexpected Receive-event while waiting for connection")
             }
         };
     };
 
+    let peer = host.peer_mut(peer_id).unwrap();
     // send a "hello"-like packet
     peer.send_packet(
-        Packet::new(b"harro", PacketMode::ReliableSequenced).unwrap(),
+        Packet::new(b"harro".to_vec(), PacketMode::ReliableSequenced).unwrap(),
         1,
     )
     .context("sending packet failed")?;
@@ -56,7 +62,9 @@ fn main() -> anyhow::Result<()> {
     peer.disconnect_later(5);
 
     loop {
-        let e = host.service(1000).context("service failed")?;
+        let e = host
+            .service(Duration::from_secs(1))
+            .context("service failed");
         println!("received event: {:#?}", e);
     }
 }

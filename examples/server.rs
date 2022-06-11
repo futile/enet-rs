@@ -1,9 +1,9 @@
 extern crate enet;
 
-use std::net::Ipv4Addr;
-
 use anyhow::Context;
 use enet::*;
+use std::net::Ipv4Addr;
+use std::time::Duration;
 
 fn main() -> anyhow::Result<()> {
     let enet = Enet::new().context("could not initialize ENet")?;
@@ -21,19 +21,23 @@ fn main() -> anyhow::Result<()> {
         .context("could not create host")?;
 
     loop {
-        match host.service(1000).context("service failed")? {
-            Some(Event::Connect(_)) => println!("new connection!"),
-            Some(Event::Disconnect(..)) => println!("disconnect!"),
-            Some(Event::Receive {
-                channel_id,
-                ref packet,
-                ..
-            }) => println!(
-                "got packet on channel {}, content: '{}'",
-                channel_id,
-                std::str::from_utf8(packet.data()).unwrap()
-            ),
-            _ => (),
+        // Wait 1 second for any events.
+        if let Some(event) = host
+            .service(Duration::from_secs(1))
+            .context("service failed")?
+        {
+            match event.kind() {
+                &EventKind::Connect => println!("new connection!"),
+                &EventKind::Disconnect { .. } => println!("disconnect!"),
+                &EventKind::Receive {
+                    ref channel_id,
+                    ref packet,
+                } => println!(
+                    "got packet on channel {}, content: '{}'",
+                    channel_id,
+                    std::str::from_utf8(packet.data()).unwrap()
+                ),
+            }
         }
     }
 }

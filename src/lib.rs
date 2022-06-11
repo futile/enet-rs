@@ -60,10 +60,10 @@ pub use enet_sys::ENetVersion as EnetVersion;
 
 pub use crate::{
     address::Address,
-    event::Event,
+    event::{Event, EventKind},
     host::{BandwidthLimit, ChannelLimit, Host},
     packet::{Packet, PacketMode},
-    peer::{Peer, PeerPacket, PeerState},
+    peer::{Peer, PeerID, PeerState},
 };
 
 const ENET_UNINITIALIZED: usize = 1;

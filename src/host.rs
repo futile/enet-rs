@@ -1,12 +1,12 @@
-use std::{marker::PhantomData, mem::MaybeUninit, sync::Arc};
+use std::{marker::PhantomData, mem::MaybeUninit, sync::Arc, time::Duration};
 
 use enet_sys::{
     enet_host_bandwidth_limit, enet_host_channel_limit, enet_host_check_events, enet_host_connect,
-    enet_host_destroy, enet_host_flush, enet_host_service, ENetHost, ENetPeer,
+    enet_host_destroy, enet_host_flush, enet_host_service, ENetEvent, ENetHost, ENetPeer,
     ENET_PROTOCOL_MAXIMUM_CHANNEL_COUNT,
 };
 
-use crate::{Address, EnetKeepAlive, Error, Event, Peer};
+use crate::{Address, EnetKeepAlive, Error, Event, Peer, PeerID};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 /// Represents a bandwidth limit or unlimited.
@@ -60,7 +60,6 @@ impl BandwidthLimit {
 /// transmission.
 pub struct Host<T> {
     inner: *mut ENetHost,
-
     _keep_alive: Arc<EnetKeepAlive>,
     _peer_data: PhantomData<*const T>,
 }
@@ -133,30 +132,100 @@ impl<T> Host<T> {
         unsafe { (*self.inner).peerCount }
     }
 
+    /// Returns a mutable reference to a peer at the given PeerID, None if the index is invalid.
+    pub fn peer_mut(&mut self, idx: PeerID) -> Option<&mut Peer<T>> {
+        if !(0..self.peer_count() as isize).contains(&idx.index) {
+            return None;
+        }
+
+        let peer = Peer::new_mut(unsafe { &mut *((*self.inner).peers.offset(idx.index)) });
+        if peer.generation() != idx.generation {
+            return None;
+        }
+
+        Some(peer)
+    }
+
+    /// Returns a reference to a peer at the given PeerID, None if the index is invalid.
+    pub fn peer(&self, idx: PeerID) -> Option<&Peer<T>> {
+        if !(0..self.peer_count() as isize).contains(&idx.index) {
+            return None;
+        }
+
+        let peer = Peer::new(unsafe { &*((*self.inner).peers.offset(idx.index)) });
+        if peer.generation() != idx.generation {
+            return None;
+        }
+
+        Some(peer)
+    }
+
+    pub(crate) unsafe fn peer_id(&self, peer: *mut ENetPeer) -> PeerID {
+        // We can do pointer arithmetic here to determine the offset of our new Peer in the
+        // list of peers, which is it's PeerID.
+        let index = peer.offset_from((*self.inner).peers);
+        let peer = Peer::<T>::new_mut(&mut *peer);
+        PeerID {
+            index,
+            generation: peer.generation(),
+        }
+    }
+
     /// Returns an iterator over all peers connected to this `Host`.
-    pub fn peers(&'_ mut self) -> impl Iterator<Item = Peer<'_, T>> {
-        // this should only fail on 32-bit platfroms when `size_t` is 64-bit, which
-        // should be super rare
-        let peer_count = unsafe { (*self.inner).peerCount.try_into().expect("too many peers") };
+    pub fn peers_mut(&mut self) -> impl Iterator<Item = &'_ mut Peer<T>> {
+        let peers = unsafe {
+            std::slice::from_raw_parts_mut(
+                (*self.inner).peers,
+                // This conversion should basically never fail.
+                // It may only fail if size_t and usize are of
+                // different size and the peerCount is very large,
+                // which is only possible on niche platforms.
+                (*self.inner).peerCount.try_into().unwrap(),
+            )
+        };
 
-        let raw_peers = unsafe { std::slice::from_raw_parts_mut((*self.inner).peers, peer_count) };
+        peers.iter_mut().map(|peer| Peer::new_mut(&mut *peer))
+    }
 
-        raw_peers.iter_mut().map(|rp| Peer::new(rp))
+    /// Returns an iterator over all peers connected to this `Host`.
+    pub fn peers(&self) -> impl Iterator<Item = &'_ Peer<T>> {
+        let peers = unsafe {
+            std::slice::from_raw_parts(
+                (*self.inner).peers,
+                // This conversion should basically never fail.
+                // It may only fail if size_t and usize are of
+                // different size and the peerCount is very large,
+                // which is only possible on niche platforms.
+                (*self.inner).peerCount.try_into().unwrap(),
+            )
+        };
+
+        peers.iter().map(|peer| Peer::new(&*peer))
+    }
+
+    fn process_event(&'_ mut self, sys_event: ENetEvent) -> Option<Event<'_, T>> {
+        Event::from_sys_event(sys_event, self)
     }
 
     /// Maintains this host and delivers an event if available.
     ///
-    /// This should be called regularly for ENet to work properly with good
-    /// performance.
-    pub fn service(&'_ mut self, timeout_ms: u32) -> Result<Option<Event<'_, T>>, Error> {
-        // ENetEvent is Copy (aka has no Drop impl), so we don't have to make sure we
-        // `mem::forget` it later on
+    /// This should be called regularly for ENet to work properly with good performance.
+    ///
+    /// The function won't block if `timeout` is less than 1ms.
+    pub fn service(&'_ mut self, timeout: Duration) -> Result<Option<Event<'_, T>>, Error> {
+        // ENetEvent is Copy (aka has no Drop impl), so we don't have to make sure we `mem::forget` it later on
         let mut sys_event = MaybeUninit::uninit();
 
-        let res = unsafe { enet_host_service(self.inner, sys_event.as_mut_ptr(), timeout_ms) };
+        let res = unsafe {
+            enet_host_service(
+                self.inner,
+                sys_event.as_mut_ptr(),
+                timeout.as_millis() as u32,
+            )
+        };
 
         match res {
-            r if r > 0 => Ok(Event::from_sys_event(unsafe { &sys_event.assume_init() })),
+            r if r > 0 => Ok(self.process_event(unsafe { sys_event.assume_init() })),
             0 => Ok(None),
             r if r < 0 => Err(Error(r)),
             _ => panic!("unreachable"),
@@ -176,7 +245,7 @@ impl<T> Host<T> {
         let res = unsafe { enet_host_check_events(self.inner, sys_event.as_mut_ptr()) };
 
         match res {
-            r if r > 0 => Ok(Event::from_sys_event(unsafe { &sys_event.assume_init() })),
+            r if r > 0 => Ok(self.process_event(unsafe { sys_event.assume_init() })),
             0 => Ok(None),
             r if r < 0 => Err(Error(r)),
             _ => panic!("unreachable"),
@@ -195,7 +264,7 @@ impl<T> Host<T> {
         address: &Address,
         channel_count: enet_sys::size_t,
         user_data: u32,
-    ) -> Result<Peer<'_, T>, Error> {
+    ) -> Result<(&mut Peer<T>, PeerID), Error> {
         let res: *mut ENetPeer = unsafe {
             enet_host_connect(
                 self.inner,
@@ -209,13 +278,19 @@ impl<T> Host<T> {
             return Err(Error(0));
         }
 
-        Ok(Peer::new(res))
+        Ok((Peer::new_mut(unsafe { &mut *res }), unsafe {
+            self.peer_id(res)
+        }))
     }
 }
 
 impl<T> Drop for Host<T> {
     /// Call the corresponding ENet cleanup-function(s).
     fn drop(&mut self) {
+        for peer in self.peers_mut() {
+            peer.drop_raw_data();
+        }
+
         unsafe {
             enet_host_destroy(self.inner);
         }

@@ -1,29 +1,42 @@
+#![allow(non_upper_case_globals)]
 use enet_sys::{
     ENetEvent, _ENetEventType_ENET_EVENT_TYPE_CONNECT, _ENetEventType_ENET_EVENT_TYPE_DISCONNECT,
     _ENetEventType_ENET_EVENT_TYPE_NONE, _ENetEventType_ENET_EVENT_TYPE_RECEIVE,
 };
 
-use crate::{Packet, Peer};
+use crate::{Host, Packet, Peer, PeerID};
 
-/// This enum represents an event that can occur when servicing an `EnetHost`.
+/// This struct represents an event that can occur when servicing a `Host`.
 ///
-/// Also see the official ENet documentation for more information.
+/// Note than if an Event is dropped that has a `EventKind::Disconnect`, it will
+/// mark the Peer as disconnected and drop all data associated with that peer (i.e. `Peer::data`).
+/// If you still need that data, make sure to take it out of the peer (e.g. `Peer::take_data`),
+/// before dropping the Disconnect Event.
+///
+/// Also never run `std::mem::forget` on an Event or modify the kind of the event, as that would
+/// skip the cleanup of the Peer.
 #[derive(Debug)]
-pub enum Event<'a, T> {
-    /// This variant represents the connection of a peer, contained in the only
-    /// field.
-    Connect(Peer<'a, T>),
-    /// This variant represents the disconnection of a peer, either because it
-    /// was requested or due to a timeout.
-    ///
-    /// The disconnected peer is contained in the first field, while the second
-    /// field contains the user-specified data for this disconnection.
-    Disconnect(Peer<'a, T>, u32),
-    /// This variants repersents a packet that was received.
+pub struct Event<'a, T> {
+    peer: &'a mut Peer<T>,
+    peer_id: PeerID,
+    kind: EventKind,
+}
+
+/// The type of an event.
+#[derive(Debug)]
+pub enum EventKind {
+    /// Peer has connected.
+    Connect,
+    /// Peer has disconnected.
+    //
+    /// The data of the peer (i.e. `Peer::data`) will be dropped when the received `Event` is dropped.
+    Disconnect {
+        /// The data associated with this event. Usually a reason for disconnection.
+        data: u32,
+    },
+    /// Peer has received a packet.
     Receive {
-        /// The `Peer` that sent the packet.
-        sender: Peer<'a, T>,
-        /// The channel on which the packet was received.
+        /// ID of the channel that the packet was received on.
         channel_id: u8,
         /// The `Packet` that was received.
         packet: Packet,
@@ -31,34 +44,83 @@ pub enum Event<'a, T> {
 }
 
 impl<'a, T> Event<'a, T> {
-    pub(crate) fn from_sys_event<'b>(event_sys: &'b ENetEvent) -> Option<Event<'a, T>> {
-        #[allow(non_upper_case_globals)]
-        match event_sys.type_ {
-            _ENetEventType_ENET_EVENT_TYPE_NONE => None,
-            _ENetEventType_ENET_EVENT_TYPE_CONNECT => {
-                Some(Event::Connect(Peer::new(event_sys.peer)))
-            }
-            _ENetEventType_ENET_EVENT_TYPE_DISCONNECT => {
-                Some(Event::Disconnect(Peer::new(event_sys.peer), event_sys.data))
-            }
-            _ENetEventType_ENET_EVENT_TYPE_RECEIVE => Some(Event::Receive {
-                sender: Peer::new(event_sys.peer),
+    pub(crate) fn from_sys_event(event_sys: ENetEvent, host: &'a Host<T>) -> Option<Event<'a, T>> {
+        if event_sys.type_ == _ENetEventType_ENET_EVENT_TYPE_NONE {
+            return None;
+        }
+
+        let peer = unsafe { Peer::new_mut(&mut *event_sys.peer) };
+        let peer_id = unsafe { host.peer_id(event_sys.peer) };
+        let kind = match event_sys.type_ {
+            _ENetEventType_ENET_EVENT_TYPE_CONNECT => EventKind::Connect,
+            _ENetEventType_ENET_EVENT_TYPE_DISCONNECT => EventKind::Disconnect {
+                data: event_sys.data,
+            },
+            _ENetEventType_ENET_EVENT_TYPE_RECEIVE => EventKind::Receive {
                 channel_id: event_sys.channelID,
                 packet: Packet::from_sys_packet(event_sys.packet),
-            }),
+            },
             _ => panic!("unrecognized event type: {}", event_sys.type_),
+        };
+
+        Some(Event {
+            peer,
+            peer_id,
+            kind,
+        })
+    }
+
+    /// The peer that this event happened on.
+    pub fn peer(&'_ self) -> &'_ Peer<T> {
+        &*self.peer
+    }
+
+    /// The peer that this event happened on.
+    pub fn peer_mut(&'_ mut self) -> &'_ mut Peer<T> {
+        self.peer
+    }
+
+    /// The `PeerID` of the peer that this event happened on.
+    pub fn peer_id(&self) -> PeerID {
+        self.peer_id
+    }
+
+    /// The type of this event.
+    pub fn kind(&self) -> &EventKind {
+        &self.kind
+    }
+
+    /// Take the EventKind out of this event.
+    /// If this peer is a Disconnect event, it will clean up the Peer.
+    /// See the `Drop` implementation
+    pub fn take_kind(mut self) -> EventKind {
+        // Unfortunately we can't simply take the `kind` out of the Event, as otherwise the `Drop`
+        // implementation would no longer work.
+        // We can however, swap the actual EventKind with an empty EventKind (in this case
+        // Connect).
+        // As the `Drop` implementation will then do nothing, we need to call cleanup_after_disconnect before we do the swap.
+        self.cleanup_after_disconnect();
+
+        let mut kind = EventKind::Connect;
+        std::mem::swap(&mut kind, &mut self.kind);
+        // No need to run the drop implementation.
+        std::mem::forget(self);
+
+        kind
+    }
+
+    fn cleanup_after_disconnect(&mut self) {
+        match self.kind {
+            EventKind::Disconnect { .. } => self.peer.cleanup_after_disconnect(),
+            EventKind::Connect | EventKind::Receive { .. } => {}
         }
     }
 }
 
+/// Dropping an `Event` with `EventKind::Disconnect` will clean up the Peer, by dropping
+/// the data associated with the `Peer`, as well as invalidating the `PeerID`.
 impl<'a, T> Drop for Event<'a, T> {
     fn drop(&mut self) {
-        // Seemingly, the lifetime of an ENetPeer ends with the end of the Disconnect
-        // event. However, this is *not really clear* in the ENet docs!
-        // It looks like the Peer *might* live longer, but not shorter, so it should be
-        // safe to destroy the associated data (if any) here.
-        if let Event::Disconnect(peer, _) = self {
-            peer.set_data(None)
-        }
+        self.cleanup_after_disconnect();
     }
 }
