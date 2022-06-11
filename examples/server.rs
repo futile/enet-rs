@@ -21,7 +21,7 @@ fn main() -> anyhow::Result<()> {
         .context("could not create host")?;
 
     loop {
-        // Wait 500 ms for any events.
+        // Wait 1 second for any events.
         if let Some(event) = host
             .service(Duration::from_secs(1))
             .context("service failed")?

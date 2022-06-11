@@ -161,6 +161,8 @@ impl<T> Host<T> {
     }
 
     pub(crate) unsafe fn peer_id(&self, peer: *mut ENetPeer) -> PeerID {
+        // We can do pointer arithmetic here to determine the offset of our new Peer in the
+        // list of peers, which is it's PeerID.
         let index = peer.offset_from((*self.inner).peers);
         let peer = Peer::<T>::new_mut(&mut *peer);
         PeerID {
@@ -174,6 +176,10 @@ impl<T> Host<T> {
         let peers = unsafe {
             std::slice::from_raw_parts_mut(
                 (*self.inner).peers,
+                // This conversion should basically never fail.
+                // It may only fail if size_t and usize are of
+                // different size and the peerCount is very large,
+                // which is only possible on niche platforms.
                 (*self.inner).peerCount.try_into().unwrap(),
             )
         };
@@ -186,6 +192,10 @@ impl<T> Host<T> {
         let peers = unsafe {
             std::slice::from_raw_parts(
                 (*self.inner).peers,
+                // This conversion should basically never fail.
+                // It may only fail if size_t and usize are of
+                // different size and the peerCount is very large,
+                // which is only possible on niche platforms.
                 (*self.inner).peerCount.try_into().unwrap(),
             )
         };
@@ -215,7 +225,7 @@ impl<T> Host<T> {
         };
 
         match res {
-            r if r > 0 => Ok(unsafe { self.process_event(sys_event.assume_init()) }),
+            r if r > 0 => Ok(self.process_event(unsafe { sys_event.assume_init() })),
             0 => Ok(None),
             r if r < 0 => Err(Error(r)),
             _ => panic!("unreachable"),
@@ -235,7 +245,7 @@ impl<T> Host<T> {
         let res = unsafe { enet_host_check_events(self.inner, sys_event.as_mut_ptr()) };
 
         match res {
-            r if r > 0 => Ok(unsafe { self.process_event(sys_event.assume_init()) }),
+            r if r > 0 => Ok(self.process_event(unsafe { sys_event.assume_init() })),
             0 => Ok(None),
             r if r < 0 => Err(Error(r)),
             _ => panic!("unreachable"),
@@ -248,7 +258,7 @@ impl<T> Host<T> {
     /// was received.
     ///
     /// `channel_count` specifies how many channels to allocate for this peer.
-    /// `data` is a user-specified value that can be chosen arbitrarily.
+    /// `user_data` is a user-specified value that can be chosen arbitrarily.
     pub fn connect(
         &mut self,
         address: &Address,
@@ -268,12 +278,9 @@ impl<T> Host<T> {
             return Err(Error(0));
         }
 
-        Ok((
-            Peer::new_mut(unsafe { &mut *res }),
-            // We can do pointer arithmetic here to determine the offset of our new Peer in the
-            // list of peers, which is it's PeerID.
-            unsafe { self.peer_id(res) },
-        ))
+        Ok((Peer::new_mut(unsafe { &mut *res }), unsafe {
+            self.peer_id(res)
+        }))
     }
 }
 

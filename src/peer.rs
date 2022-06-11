@@ -26,17 +26,6 @@ use crate::{Address, Error, Packet};
 ///
 /// ENet allows the association of arbitrary data with each peer.
 /// The type of this associated data is chosen through `T`.
-///
-/// ## Peer lifetimes
-/// An enet `Peer` technically has the same lifetime as the Host it belongs to.
-/// This however also means that a Peer may be ill-defined state, when it does not currently
-/// represent an active connection.
-///
-/// With enet-rs, a specific `PeerID` will only ever reference a `Peer` that corresponds to an
-/// active connection.
-/// As soon as an `Event` that contains an `EventKind::Disconnect` is dropped, the `PeerID` of the
-/// corresponding `Peer` will be invalidated.
-/// The data associated with a Peer will also be dropped at that point.
 #[repr(transparent)]
 pub struct Peer<T> {
     inner: ENetPeer,
@@ -65,6 +54,16 @@ impl<'a, T> Peer<T>
 where
     T: 'a,
 {
+    // -------- Note: Peer lifetimes -------------
+    // An enet `Peer` technically has the same lifetime as the Host it belongs to.
+    // This however also means that a Peer may be in an ill-defined state, when it
+    // does not currently represent an active connection.
+    //
+    // With enet-rs, a specific `PeerID` will only ever reference a `Peer` that corresponds to an
+    // active connection.
+    // As soon as an `Event` that contains an `EventKind::Disconnect` is dropped, the `PeerID` of the
+    // corresponding `Peer` will be invalidated.
+    // The data associated with a Peer will also be dropped at that point.
     pub(crate) fn new(inner: &'a ENetPeer) -> &'a Peer<T> {
         // Safety:
         // This code interprets the `ENetPeer` reference as a `Peer` reference instead.

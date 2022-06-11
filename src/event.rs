@@ -6,7 +6,15 @@ use enet_sys::{
 
 use crate::{Host, Packet, Peer, PeerID};
 
-/// This struct represents an event that can occur when servicing an `Host`.
+/// This struct represents an event that can occur when servicing a `Host`.
+///
+/// Note than if an Event is dropped that has a `EventKind::Disconnect`, it will
+/// mark the Peer as disconnected and drop all data associated with that peer (i.e. `Peer::data`).
+/// If you still need that data, make sure to take it out of the peer (e.g. `Peer::take_data`),
+/// before dropping the Disconnect Event.
+///
+/// Also never run `std::mem::forget` on an Event or modify the kind of the event, as that would
+/// skip the cleanup of the Peer.
 #[derive(Debug)]
 pub struct Event<'a, T> {
     peer: &'a mut Peer<T>,
@@ -21,7 +29,7 @@ pub enum EventKind {
     Connect,
     /// Peer has disconnected.
     //
-    /// The data of the peer will be dropped when the received `Event` is dropped.
+    /// The data of the peer (i.e. `Peer::data`) will be dropped when the received `Event` is dropped.
     Disconnect {
         /// The data associated with this event. Usually a reason for disconnection.
         data: u32,
@@ -95,6 +103,9 @@ impl<'a, T> Event<'a, T> {
 
         let mut kind = EventKind::Connect;
         std::mem::swap(&mut kind, &mut self.kind);
+        // No need to run the drop implementation.
+        std::mem::forget(self);
+
         kind
     }
 
